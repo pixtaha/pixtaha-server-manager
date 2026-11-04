@@ -63,6 +63,7 @@ export interface ServerInfo {
   disk_total_gb: number;
   os: string;
   kernel?: string;
+  public_ip?: string | null;
   uptime_seconds: number;
   /** Hub addition: last heartbeat (the daily report is one per day, heartbeats every 30 s). */
   last_heartbeat_at: string;

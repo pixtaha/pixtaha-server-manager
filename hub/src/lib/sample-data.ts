@@ -289,6 +289,8 @@ function detail(summary: ServerSummary, spec: DetailSpec): ServerDetail {
       disk_total_gb: spec.hw.diskGb,
       os: spec.hw.os,
       kernel: spec.hw.kernel,
+      // RFC 5737 documentation range: never a real address.
+      public_ip: `203.0.113.${10 + SAMPLE_FLEET.servers.findIndex((x) => x.hostname === host)}`,
       uptime_seconds: Math.round(spec.uptimeDays * 86400),
       last_heartbeat_at: summary.lastSeenAt,
     },
