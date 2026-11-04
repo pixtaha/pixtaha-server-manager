@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14110E">
+<title>Offline · Pixtaha Management</title>
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32">
+<style>
+  /* Pixtaha Design System tokens (dark primary, light via prefers-color-scheme), inlined so the page works with no network. */
+  :root { --color-bg:#14110E; --color-surface:#1D1916; --color-border:#332B25; --color-text:#F3ECE4; --color-text-muted:#B8AEA6; --color-brand:#C65D3B; --color-primary:#E07A56; --color-on-primary:#1A1411; --radius-panel:24px; --radius-pill:999px; color-scheme: dark; }
+  @media (prefers-color-scheme: light) {
+    :root { --color-bg:#FAF6F1; --color-surface:#FFFFFF; --color-border:#E8E0D7; --color-text:#1A1411; --color-text-muted:#5F544C; --color-primary:#B8522F; --color-on-primary:#FFFFFF; color-scheme: light; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100dvh; background: var(--color-bg); color: var(--color-text); font-family: "IBM Plex Sans", system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; padding-block: env(safe-area-inset-top) env(safe-area-inset-bottom); padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); }
+  header { padding: 24px; font-weight: 500; }
+  header span { color: var(--color-brand); }
+  header small { font-size: 15px; font-weight: 400; color: var(--color-text-muted); margin-inline-start: 6px; }
+  main { flex: 1; display: grid; place-items: center; padding: 24px 20px 64px; }
+  .card { width: 100%; max-width: 460px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-panel); padding: 32px; display: flex; flex-direction: column; gap: 16px; }
+  h1 { margin: 0; font-size: 28px; font-weight: 420; letter-spacing: -0.015em; display: flex; align-items: center; gap: 12px; }
+  p { margin: 0; font-size: 15px; line-height: 1.6; color: var(--color-text-muted); }
+  button { align-self: flex-start; height: 44px; padding-inline: 20px; border: 0; border-radius: var(--radius-pill); background: var(--color-primary); color: var(--color-on-primary); font: inherit; font-weight: 500; cursor: pointer; }
+</style>
+</head>
+<body>
+  <header>Pixtaha<span>.</span><small>Management</small></header>
+  <main>
+    <div class="card" role="status">
+      <h1><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.8"/><path d="M19 12.9a10 10 0 0 0-2.1-1.6"/><path d="M2 8.8a15 15 0 0 1 4.2-2.6"/><path d="M22 8.8A15 15 0 0 0 10.7 5"/><path d="m2 2 20 20"/></svg>You are offline.</h1>
+      <p>Pixtaha Management needs a connection to show live server data.</p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </div>
+  </main>
+</body>
+</html>

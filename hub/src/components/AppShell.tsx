@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AlertsStateProvider, useAlertsState } from "./alerts/AlertsState";
+import { InstallApp } from "./InstallApp";
 import { ThemeToggle } from "./ThemeToggle";
 import { Wordmark } from "./Wordmark";
 
@@ -69,6 +70,7 @@ function Account() {
           <LogOut size={14} strokeWidth={1.75} aria-hidden /> {busy ? "Signing out…" : "Sign out"}
         </button>
       ) : null}
+      <InstallApp />
     </div>
   );
 }
