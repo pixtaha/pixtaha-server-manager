@@ -4,7 +4,7 @@
  * - Static hashed assets (/_next/static/*, /icons/*, fonts): cache-first.
  * - Failed navigations fall back to /offline.html (precached).
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE = `pm-static-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
