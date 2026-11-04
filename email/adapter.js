@@ -52,11 +52,42 @@ var PxReportAdapter = (function () {
     var rp = p.report, s = p.server, k = p.kpis, b = p.blocks || {};
     var ref = rp.generated_at;
     var status = sev(p.status.overall);
+    // issue history from the database (server_manager.issue_history), optional
+    var H = opt.history || null;
+    var firstReport = !H || (H.reports || 0) <= 1;
+    var hmap = {};
+    ((H && H.open) || []).forEach(function (h) { hmap[h.key] = h; });
+    function hkey(a) { return a.key || ((a.id || a.check || 'unknown') + '|' + (a.title || '')); }
+    function openFor(iso) {
+      var h = (new Date(ref) - new Date(iso)) / 3600000;
+      if (h < 24) return 'Open since ' + hhmm(iso);
+      var d = Math.floor(h / 24);
+      return 'Open ' + d + ' day' + (d === 1 ? '' : 's');
+    }
     var att = (p.attention || []).map(function (a) {
-      return { sev: sev(a.severity), title: esc(a.title), impact: esc(a.impact || ''), action: esc(a.action || ''), _title: a.title };
-    }).sort(function (x, y) { return RANK[x.sev] - RANK[y.sev]; });
+      var h = firstReport ? null : hmap[hkey(a)];
+      var tag = h ? (h.new ? { kind: 'new', text: 'New' } : { kind: 'open', text: openFor(h.first_seen_at) }) : null;
+      return { sev: sev(a.severity), title: esc(a.title), impact: esc(a.impact || ''), action: esc(a.action || ''), _title: a.title, tag: tag };
+    }).sort(function (x, y) { return (RANK[x.sev] - RANK[y.sev]) || ((x.tag && x.tag.kind === 'new' ? 0 : 1) - (y.tag && y.tag.kind === 'new' ? 0 : 1)); });
     var nCrit = att.filter(function (a) { return a.sev === 'critical'; }).length;
     var nWarn = att.filter(function (a) { return a.sev === 'warning'; }).length;
+    var digest = null;
+    if (H && !firstReport) {
+      var nNew = att.filter(function (a) { return a.tag && a.tag.kind === 'new'; }).length;
+      var resolved = (H.resolved || []).map(function (x) {
+        return { title: esc(x.title), sev: sev(x.severity), since: dayMonth(x.first_seen_at) };
+      });
+      digest = { nNew: nNew, nResolved: resolved.length, nOpen: att.length - nNew, resolved: resolved,
+                 prev: H.previous_report_at ? whenShort(H.previous_report_at, ref) : null };
+    }
+    function changePhrase() {
+      if (!digest) return '';
+      if (!digest.nNew && !digest.nResolved) return 'Nothing changed since the last report.';
+      var parts = [];
+      if (digest.nNew) parts.push(plural(digest.nNew, 'new issue'));
+      if (digest.nResolved) parts.push(digest.nResolved + ' resolved');
+      return 'Since the last report: ' + parts.join(', ') + '.';
+    }
 
     var v = {
       server: s.hostname,
@@ -70,7 +101,8 @@ var PxReportAdapter = (function () {
       generated: hhmm(ref),
       agent: rp.collector_version ? 'v' + rp.collector_version : null,
       to: opt.to || 'contact@pixtaha.com',
-      attention: att
+      attention: att,
+      digest: digest
     };
 
     // ---------- status line, note, subject, preheader
@@ -84,14 +116,18 @@ var PxReportAdapter = (function () {
     } else {
       v.statusLine = 'All checks passed.';
     }
+    var cp = changePhrase();
     if (p.note) v.note = p.note;
-    else if (status === 'critical') v.note = 'Good morning. ' + s.hostname + ' is up, but ' + (nCrit === 1 ? 'one critical issue needs' : nCrit + ' critical issues need') + ' fixing today: ' + lowerFirst(att[0]._title) + '.' + (att.length > 1 ? ' ' + (att.length - 1 === 1 ? 'One smaller item follows.' : (att.length - 1) + ' smaller items follow.') : '');
-    else if (att.length) v.note = 'Good morning. ' + s.hostname + ' ran normally overnight. ' + (att.length === 1 ? 'One item needs' : plural(att.length, 'item') + ' need') + ' your attention; the top one: ' + lowerFirst(att[0]._title) + '.';
+    else if (status === 'critical') v.note = 'Good morning. ' + (cp ? cp + ' ' : '') + s.hostname + ' is up, but ' + (nCrit === 1 ? 'one critical issue needs' : nCrit + ' critical issues need') + ' fixing today: ' + lowerFirst(att[0]._title) + '.' + (att.length > 1 ? ' ' + (att.length - 1 === 1 ? 'One smaller item follows.' : (att.length - 1) + ' smaller items follow.') : '');
+    else if (att.length) v.note = 'Good morning. ' + (cp ? cp + ' ' : '') + s.hostname + ' ran normally overnight. ' + (att.length === 1 ? 'One item needs' : plural(att.length, 'item') + ' need') + ' your attention; the top one: ' + lowerFirst(att[0]._title) + '.';
     else v.note = 'Good morning. ' + s.hostname + ' had a quiet, healthy night. Nothing needs your attention today.';
 
     var n8nB = b.n8n && b.n8n.instances && b.n8n.instances.length ? b.n8n : null;
-    v.subject = '[' + LABEL[status] + '] ' + s.hostname + ' · Daily report · ' + dateShort(ref);
+    var change = !digest ? 'Daily report' : (!digest.nNew && !digest.nResolved) ? 'No change' :
+      [digest.nNew ? digest.nNew + ' new' : null, digest.nResolved ? digest.nResolved + ' resolved' : null].filter(Boolean).join(', ');
+    v.subject = '[' + LABEL[status] + '] ' + s.hostname + ' · ' + change + ' · ' + dateShort(ref);
     var pre = [];
+    if (cp) pre.push(cp.replace(/\.$/, ''));
     if (status === 'critical') pre.push(plural(nCrit, 'critical') + (nWarn ? ', ' + plural(nWarn, 'warning') : ''));
     else if (att.length) pre.push(plural(att.length, 'item') + ' need' + (att.length === 1 ? 's' : '') + ' attention');
     else pre.push('All checks passed');
@@ -160,8 +196,8 @@ var PxReportAdapter = (function () {
         var note = x.note || [x.dead_host_nodes ? plural(x.dead_host_nodes, 'node') + ' call a dead host' : null, x.mem_limit_mb === null ? 'No memory limit' : null].filter(Boolean).join(' · ');
         return {
           name: x.container || x.name, version: x.version, sev: sev(x.status), pinned: x.pinned !== false,
-          wf: (x.workflows_active || 0) + ' / ' + (x.workflows_total || 0),
-          exec: num(x.executions_ok_24h) + ' ok · ' + num(x.executions_failed_24h) + ' failed', failed: x.executions_failed_24h || 0,
+          wf: x.workflows_total == null ? '—' : (x.workflows_active || 0) + ' / ' + x.workflows_total,
+          exec: x.executions_ok_24h == null ? 'not readable' : num(x.executions_ok_24h) + ' ok · ' + num(x.executions_failed_24h) + ' failed', failed: x.executions_failed_24h || 0,
           db: (x.db_type === 'postgresdb' || x.db_type === 'postgres' ? 'Postgres ' : 'SQLite ') + mb(x.db_size_mb), dbSev: dbSev,
           tg: !tg.length ? 'Not set' : (bad ? (bad + ' mismatch') : plural(tg.length, 'bot') + ' OK'), tgSev: bad ? 'critical' : null,
           missed: x.schedules_missed_24h || 0, note: esc(note) || null
