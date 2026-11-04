@@ -37,7 +37,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 SCHEMA = "1.0"
 
 CONFIG_FILE = os.environ.get("PIXTAHA_CONFIG", "/etc/pixtaha-collector/config.env")
@@ -64,6 +64,7 @@ CLOUDFLARE = [ipaddress.ip_network(n) for n in (
     "108.162.192.0/18", "190.93.240.0/20", "188.114.96.0/20", "197.234.240.0/22", "198.41.128.0/17",
     "162.158.0.0/15", "104.16.0.0/13", "104.24.0.0/14", "172.64.0.0/13", "131.0.72.0/22",
 )]
+BACKUP_FILE = re.compile(r"\.(tar|tgz|gz|zip|7z|zst|xz|bz2|sql|dump|bak|backup|json|sqlite|db)$", re.I)
 SEV_RANK = {"critical": 0, "warning": 1, "offline": 2, "unknown": 3, "info": 4, "healthy": 5}
 
 
@@ -601,6 +602,20 @@ def n8n_sqlite_counts(path, since):
     return out
 
 
+def n8n_version_from_fs(c):
+    """Reads n8n's package.json through the container's overlay MergedDir (host read, no exec)."""
+    merged = (((c.get("GraphDriver") or {}).get("Data")) or {}).get("MergedDir")
+    if not merged:
+        return None
+    for rel in ("usr/local/lib/node_modules/n8n/package.json", "usr/lib/node_modules/n8n/package.json"):
+        txt = read(os.path.join(merged, rel))
+        if txt:
+            m = re.search(r'"version"\s*:\s*"([^"]+)"', txt)
+            if m:
+                return m.group(1)
+    return None
+
+
 def n8n_data_dir(c):
     for m in c.get("Mounts") or []:
         if m.get("Destination") in ("/home/node/.n8n", "/root/.n8n"):
@@ -614,7 +629,7 @@ def build_n8n(containers, since, state, mem_limits):
     sizes = {}
     for c in containers:
         repo, tag, pinned = split_image((c.get("Config") or {}).get("Image"))
-        if not repo or not re.search(r"(^|/)n8n$", repo):
+        if not (repo and re.search(r"(^|/)n8n$", repo)) and not n8n_data_dir(c):
             continue
         st = (c.get("State") or {}).get("Status")
         if st not in ("running", "restarting"):
@@ -626,7 +641,7 @@ def build_n8n(containers, since, state, mem_limits):
         if (not host or host == "localhost") and env.get("WEBHOOK_URL"):
             host = re.sub(r"^https?://", "", env["WEBHOOK_URL"]).split("/")[0]
         inst = {
-            "name": name, "container": name, "version": env.get("N8N_VERSION") or tag,
+            "name": name, "container": name, "version": env.get("N8N_VERSION") or n8n_version_from_fs(c) or (tag if pinned and tag != "digest" else None),
             "pinned": pinned, "status": "healthy", "host": host or None,
             "db_type": db_type, "db_size_mb": None, "db_growth_mb_24h": None,
             "workflows_total": None, "workflows_active": None,
@@ -781,7 +796,7 @@ def build_databases(containers, n8n_insts, backups_files):
         last = newest_matching(backups_files, hint, name)
         dbs.append({
             "name": name, "engine": engine, "version": tag if tag not in (None, "latest", "digest") else None,
-            "status": backup_sev(last), "size_mb": size, "growth_mb_24h": None,
+            "status": "info" if (engine == "Redis" and last is None) else backup_sev(last), "size_mb": size, "growth_mb_24h": None,
             "connections": None, "max_connections": None, "last_backup_at": iso(last) if last else None,
         })
     for inst in n8n_insts:
@@ -862,6 +877,8 @@ def scan_backups(cfg):
                 n += 1
                 if n > 5000:
                     break
+                if not BACKUP_FILE.search(fn):
+                    continue
                 p = os.path.join(root, fn)
                 try:
                     stt = os.stat(p)
@@ -1187,8 +1204,10 @@ def check_domain(name, server, expected_ips, certbot):
         res["cert_days_left"] = int((exp - time.time()) // 86400)
         issuer = " ".join(v for rdn in cert.get("issuer", ()) for (_, v) in rdn)
         conn = http.client.HTTPSConnection(name, 443, timeout=10, context=ctx)
-        conn.request("HEAD", "/", headers={"User-Agent": "pixtaha-collector/" + VERSION})
-        res["http_status"] = conn.getresponse().status
+        conn.request("GET", "/", headers={"User-Agent": "pixtaha-collector/" + VERSION, "Range": "bytes=0-0"})
+        resp = conn.getresponse()
+        res["http_status"] = resp.status
+        resp.read(1024)
         conn.close()
         res["https_ok"] = res["http_status"] < 500
     except (OSError, ssl.SSLError, http.client.HTTPException, KeyError, ValueError):
@@ -1316,7 +1335,7 @@ def build_attention(kpis, mem, disk, cont_items, cont_block, n8n_insts, dbs, dom
         add("backups.age", "critical", "No backups found on this server", "A disk failure or a bad change cannot be undone.", "Schedule daily backups and copy them off the server.")
     else:
         old = [b for b in backups if b["status"] in ("warning", "critical")]
-        nodb = [d["name"] for d in dbs if d["last_backup_at"] is None]
+        nodb = [d["name"] for d in dbs if d["last_backup_at"] is None and d["engine"] != "Redis"]
         stale = [d["name"] for d in dbs if d["last_backup_at"] and (now_utc() - parse_iso(d["last_backup_at"])).total_seconds() > 48 * 3600]
         if stale:
             add("backups.age", "warning", "Database backup older than 48 hours: %s" % names(stale, 3),
