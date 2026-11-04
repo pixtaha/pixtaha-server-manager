@@ -1,0 +1,157 @@
+/* Pixtaha Design System tokens (exported from Claude Design). Fonts are self-hosted with @fontsource (imported in layout.tsx). */
+/* Pixtaha color tokens. Light is primary; dark is scoped to [data-theme="dark"]. ONE accent: terracotta. */
+:root,[data-theme="light"]{
+--terracotta-500:#C65D3B;--terracotta-600:#B8522F;--terracotta-700:#A4472A;--terracotta-400:#E07A56;--terracotta-300:#E88C6B;
+--cream-50:#FAF6F1;--cream-100:#F3EDE6;--cream-200:#E8E0D7;--cream-300:#D6CABE;
+--ink-900:#1A1411;--ink-700:#5F544C;--ink-500:#7A6D64;
+--color-brand:#C65D3B;
+--color-bg:#FAF6F1;
+--color-surface:#FFFFFF;
+--color-surface-raised:#FFFFFF;
+--color-surface-sunken:#F3EDE6;
+--color-border:#E8E0D7;
+--color-border-strong:#D6CABE;
+--color-text:#1A1411;
+--color-text-muted:#5F544C;
+--color-text-subtle:#7A6D64;
+--color-primary:#B8522F;
+--color-primary-hover:#A4472A;
+--color-on-primary:#FFFFFF;
+--color-glow:rgba(198,93,59,.14);
+--color-glow-strong:rgba(198,93,59,.34);
+--color-success:#2F7D4F;
+--color-success-soft:#E7F2EA;
+--color-danger:#B42318;
+--color-danger-soft:#FBEAE8;
+--color-focus:#B8522F;
+--color-appbar:rgba(255,255,255,.72);
+--color-overlay:rgba(26,20,17,.32);
+/* semantic aliases */
+--text-body:var(--color-text);--text-heading:var(--color-text);--text-label:var(--color-text);
+--surface-page:var(--color-bg);--surface-card:var(--color-surface);--surface-input:var(--color-surface);
+--border-hairline:var(--color-border);
+color-scheme:light;
+}
+[data-theme="dark"]{
+--color-brand:#C65D3B;
+--color-bg:#14110E;
+--color-surface:#1D1916;
+--color-surface-raised:#262019;
+--color-surface-sunken:#110E0C;
+--color-border:#332B25;
+--color-border-strong:#4A3F37;
+--color-text:#F3ECE4;
+--color-text-muted:#B8AEA6;
+--color-text-subtle:#958A81;
+--color-primary:#E07A56;
+--color-primary-hover:#E88C6B;
+--color-on-primary:#1A1411;
+--color-glow:rgba(224,122,86,.16);
+--color-glow-strong:rgba(224,122,86,.42);
+--color-success:#4CC38A;
+--color-success-soft:rgba(76,195,138,.12);
+--color-danger:#F07065;
+--color-danger-soft:rgba(240,112,101,.12);
+--color-focus:#E07A56;
+--color-appbar:rgba(29,25,22,.72);
+--color-overlay:rgba(0,0,0,.5);
+color-scheme:dark;
+}
+
+:root{
+--font-sans:"IBM Plex Sans",system-ui,sans-serif;
+--font-arabic:"IBM Plex Sans Arabic","IBM Plex Sans",system-ui,sans-serif;
+--font-mono:"IBM Plex Mono",ui-monospace,monospace;
+--font-body:var(--font-sans);
+--font-eyebrow:var(--font-mono);
+--weight-light:300;--weight-regular:400;--weight-headline:420;--weight-medium:500;--weight-semibold:600;
+--size-display:clamp(48px,7.2vw,96px);--size-h1:clamp(40px,5vw,60px);--size-h2:clamp(32px,3.6vw,44px);--size-h3:28px;
+--size-body-lg:20px;--size-body:16px;--size-small:14px;--size-caption:13px;--size-eyebrow:12px;
+--leading-display:1.0;--leading-h1:1.05;--leading-h2:1.12;--leading-h3:1.25;--leading-body:1.6;--leading-tight:1.35;
+--tracking-display:-0.045em;--tracking-h1:-0.035em;--tracking-h2:-0.025em;--tracking-h3:-0.015em;--tracking-eyebrow:0.08em;
+--case-eyebrow:uppercase; /* @kind other */
+}
+/* Arabic: switch family, loosen leading, and NEVER track (letters must stay joined). */
+[dir="rtl"],:lang(ar){
+--font-body:var(--font-arabic);--font-eyebrow:var(--font-arabic);
+--tracking-display:0;--tracking-h1:0;--tracking-h2:0;--tracking-h3:0;--tracking-eyebrow:0;
+--leading-display:1.2;--leading-h1:1.25;--leading-h2:1.3;--leading-h3:1.4;--leading-body:1.8;
+--size-eyebrow:13px;
+--case-eyebrow:none; /* @kind other */
+}
+
+:root{
+--space-0:0;--space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;--space-10:40px;--space-12:48px;--space-16:64px;--space-20:80px;--space-24:96px;--space-32:128px;
+--radius-pill:999px;--radius-sm:8px;--radius-input:12px;--radius-card:16px;--radius-panel:24px;
+--container-max:1200px;--gutter:24px;
+--section-gap:96px;
+--appbar-h:60px;--control-h-sm:36px;--control-h:44px;--control-h-lg:52px;
+}
+@media (max-width:768px){:root{--section-gap:64px;--gutter:20px}}
+
+:root{
+--border-width:1px;
+--shadow-none:none;
+--shadow-float:0 1px 2px rgba(26,20,17,.04),0 12px 32px -16px rgba(26,20,17,.18);
+--ring-focus:0 0 0 2px var(--color-bg),0 0 0 4px var(--color-focus);
+--ring-input:0 0 0 3px var(--color-glow);
+--blur-appbar:saturate(1.4) blur(16px); /* @kind other */
+--blur-glow:48px;
+--ease-out:cubic-bezier(.2,.7,.2,1); /* @kind other */
+--ease-in-out:cubic-bezier(.6,0,.3,1); /* @kind other */
+--dur-fast:120ms; /* @kind other */
+--dur:200ms; /* @kind other */
+--dur-slow:420ms; /* @kind other */
+}
+[data-theme="dark"]{--shadow-float:0 1px 2px rgba(0,0,0,.3),0 16px 40px -20px rgba(0,0,0,.6)}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);font-size:var(--size-body);line-height:var(--leading-body);-webkit-font-smoothing:antialiased}
+[data-theme]{background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)}
+a{color:var(--color-text);text-underline-offset:3px}
+a:hover{color:var(--color-primary)}
+.px-display{font-size:var(--size-display);line-height:var(--leading-display);letter-spacing:var(--tracking-display);font-weight:var(--weight-headline);margin:0;text-wrap:balance}
+.px-h1{font-size:var(--size-h1);line-height:var(--leading-h1);letter-spacing:var(--tracking-h1);font-weight:var(--weight-headline);margin:0;text-wrap:balance}
+.px-h2{font-size:var(--size-h2);line-height:var(--leading-h2);letter-spacing:var(--tracking-h2);font-weight:var(--weight-regular);margin:0;text-wrap:balance}
+.px-h3{font-size:var(--size-h3);line-height:var(--leading-h3);letter-spacing:var(--tracking-h3);font-weight:var(--weight-regular);margin:0}
+.px-body-lg{font-size:var(--size-body-lg);line-height:var(--leading-body);color:var(--color-text-muted);margin:0;text-wrap:pretty}
+.px-body{font-size:var(--size-body);line-height:var(--leading-body);margin:0;text-wrap:pretty}
+.px-small{font-size:var(--size-small);line-height:1.5;color:var(--color-text-muted);margin:0}
+.px-eyebrow{font-family:var(--font-eyebrow);font-size:var(--size-eyebrow);letter-spacing:var(--tracking-eyebrow);text-transform:var(--case-eyebrow);color:var(--color-text-subtle);font-weight:var(--weight-medium);margin:0}
+.px-container{max-width:var(--container-max);margin-inline:auto;padding-inline:var(--gutter)}
+.px-flip-rtl:dir(rtl){transform:scaleX(-1)}
+[dir="rtl"] .px-flip-rtl{transform:scaleX(-1)}
+
+/* Pixtaha Management — token additions on top of Pixtaha Design System (status scale needs Warning + Offline). */
+:root,[data-theme="light"]{
+--text-body:var(--color-text);--text-heading:var(--color-text);--text-label:var(--color-text);--surface-page:var(--color-bg);--surface-card:var(--color-surface);--surface-input:var(--color-surface);--border-hairline:var(--color-border);
+--color-warning:#8F5B00;--color-warning-soft:#F8EED9;
+--color-offline:#5F544C;--color-offline-soft:#F3EDE6;
+--color-critical:var(--color-danger);--color-critical-soft:var(--color-danger-soft);
+--color-healthy:var(--color-success);--color-healthy-soft:var(--color-success-soft);
+}
+[data-theme="dark"]{
+--text-body:var(--color-text);--text-heading:var(--color-text);--text-label:var(--color-text);--surface-page:var(--color-bg);--surface-card:var(--color-surface);--surface-input:var(--color-surface);--border-hairline:var(--color-border);
+--color-warning:#E2B254;--color-warning-soft:rgba(226,178,84,.12);
+--color-offline:#B8AEA6;--color-offline-soft:rgba(184,174,166,.10);
+--color-critical:var(--color-danger);--color-critical-soft:var(--color-danger-soft);
+--color-healthy:var(--color-success);--color-healthy-soft:var(--color-success-soft);
+}
+
+.px-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;height:var(--control-h);padding-inline:22px;border-radius:var(--radius-pill);border:1px solid transparent;font:inherit;font-family:var(--font-body);font-size:15px;font-weight:var(--weight-medium);line-height:1;white-space:nowrap;text-decoration:none;cursor:pointer;transition:background var(--dur) var(--ease-out),border-color var(--dur) var(--ease-out),color var(--dur) var(--ease-out),transform var(--dur-fast) var(--ease-out);-webkit-tap-highlight-color:transparent}
+.px-btn--sm{height:var(--control-h-sm);padding-inline:16px;font-size:14px}
+.px-btn--lg{height:var(--control-h-lg);padding-inline:26px;font-size:16px}
+.px-btn--primary{background:var(--color-primary);color:var(--color-on-primary)}
+.px-btn--primary:hover,.px-btn--primary.is-hover{background:var(--color-primary-hover);color:var(--color-on-primary)}
+.px-btn--secondary{background:transparent;color:var(--color-text);border-color:var(--color-border-strong)}
+.px-btn--secondary:hover,.px-btn--secondary.is-hover{background:var(--color-surface);border-color:var(--color-text-subtle);color:var(--color-text)}
+.px-btn--ghost{background:transparent;color:var(--color-text)}
+.px-btn--ghost:hover,.px-btn--ghost.is-hover{background:var(--color-surface-sunken);color:var(--color-text)}
+.px-btn:active{transform:scale(.98)}
+.px-btn:focus-visible,.px-btn.is-focus{outline:none;box-shadow:var(--ring-focus)}
+.px-btn[disabled],.px-btn[aria-disabled="true"]{opacity:.45;cursor:not-allowed;transform:none}
+.px-btn.is-loading{cursor:progress}
+.px-btn.is-loading .px-btn__label{opacity:.72}
+.px-btn--secondary.has-avatars{padding-inline-start:6px}
+.px-btn--icon{padding:0;aspect-ratio:1}
