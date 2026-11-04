@@ -15,10 +15,10 @@ export function StatusIcon({ status, size }: { status: Status; size: number }) {
   }
 }
 
-/** `label` overrides the text (e.g. a container state), the icon still follows the status. */
-export function StatusPill({ status, size = "md", label }: { status: Status; size?: "sm" | "md"; label?: string }) {
+/** `variant="plain"` drops the background (Claude Design Status Pill "plain"). `label` overrides the text (e.g. a container state), the icon still follows the status. */
+export function StatusPill({ status, size = "md", label, variant = "pill" }: { status: Status; size?: "sm" | "md"; label?: string; variant?: "pill" | "plain" }) {
   return (
-    <span role="status" className={`pill pill--${status}${size === "sm" ? " pill--sm" : ""}`}>
+    <span role="status" className={`pill pill--${status}${size === "sm" ? " pill--sm" : ""}${variant === "plain" ? " pill--plain" : ""}`}>
       <StatusIcon status={status} size={size === "sm" ? 12 : 14} />
       {label ?? STATUS_LABEL[status]}
     </span>

@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/AppShell";
 import { themeInitScript } from "@/components/ThemeToggle";
-import { getFleet } from "@/lib/data";
+import { getAlerts } from "@/lib/data";
 import "@fontsource/ibm-plex-sans/latin-300.css";
 import "@fontsource/ibm-plex-sans/latin-400.css";
 import "@fontsource/ibm-plex-sans/latin-500.css";
@@ -26,15 +26,15 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const fleet = await getFleet();
-  const openAlerts = fleet.servers.reduce((n, s) => n + s.alertsCritical + s.alertsWarning, 0);
+  const { alerts } = await getAlerts();
+  const openAlertIds = alerts.filter((a) => a.state === "open").map((a) => a.id);
   return (
     <html lang="en" dir="ltr" data-theme="dark" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
-        <AppShell openAlerts={openAlerts}>{children}</AppShell>
+        <AppShell openAlertIds={openAlertIds}>{children}</AppShell>
       </body>
     </html>
   );
