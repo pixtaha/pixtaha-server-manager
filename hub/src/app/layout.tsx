@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { AppShell } from "@/components/AppShell";
 import { themeInitScript } from "@/components/ThemeToggle";
-import { getAlerts } from "@/lib/data";
 import "@fontsource/ibm-plex-sans/latin-300.css";
 import "@fontsource/ibm-plex-sans/latin-400.css";
 import "@fontsource/ibm-plex-sans/latin-500.css";
@@ -25,16 +23,15 @@ export const viewport: Viewport = {
   ],
 };
 
-export default async function RootLayout({ children }: { children: ReactNode }) {
-  const { alerts } = await getAlerts();
-  const openAlertIds = alerts.filter((a) => a.state === "open").map((a) => a.id);
+/** Root: document, fonts, tokens and theme only. The app shell lives in (app)/layout.tsx, the sign-in shell in (auth). */
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" dir="ltr" data-theme="dark" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
-        <AppShell openAlertIds={openAlertIds}>{children}</AppShell>
+        {children}
       </body>
     </html>
   );
