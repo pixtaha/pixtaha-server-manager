@@ -1,0 +1,194 @@
+{
+  "name": "Server Manager Alerts",
+  "nodes": [
+    {
+      "id": "a1",
+      "name": "Alert Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "server-alert",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Server Manager Report Token"
+        }
+      }
+    },
+    {
+      "id": "a2",
+      "name": "Ingest Heartbeat",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select server_manager.ingest_heartbeat(convert_from(decode($1, 'base64'), 'UTF8')::jsonb) as result",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify($json.body).base64Encode() }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "name": "Server Manager DB Writer"
+        }
+      }
+    },
+    {
+      "id": "a3",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a4",
+      "name": "Check Offline Servers",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        192
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select server_manager.offline_check(15) as result",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "name": "Server Manager DB Writer"
+        }
+      }
+    },
+    {
+      "id": "a5",
+      "name": "Format Telegram Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Turns ingest_heartbeat / offline_check results into one Telegram message per event.\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst cairo = (t) => new Date(t || Date.now()).toLocaleString('en-GB', {\n  timeZone: 'Africa/Cairo', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,\n}) + ' Cairo';\nconst dur = (s) => {\n  s = Math.max(0, Math.round(Number(s) || 0));\n  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);\n  if (d) return `${d}d ${h}h`;\n  if (h) return `${h}h ${m}m`;\n  return m ? `${m}m` : `${s}s`;\n};\nconst out = [];\nfor (const item of $input.all()) {\n  let r = item.json.result;\n  if (typeof r === 'string') r = JSON.parse(r);\n  const events = Array.isArray(r) ? r : (r && r.events) || [];\n  for (const e of events) {\n    const who = `<b>${esc(e.hostname)}</b>` + (e.client ? ` (${esc(e.client)})` : '');\n    let text;\n    if (e.kind === 'alert') {\n      text = `🔴 CRITICAL · ${who}\\n${esc(e.title)}` + (e.detail ? `\\n${esc(e.detail)}` : '') + `\\n${cairo(e.at)}`;\n    } else if (e.kind === 'resolved') {\n      text = `✅ RESOLVED · <b>${esc(e.hostname)}</b>\\n${esc(e.title)}\\nLasted ${dur(e.duration_s)} · ${cairo(e.at)}`;\n    } else if (e.kind === 'offline') {\n      text = `⚫ SERVER OFFLINE · ${who}\\nNo heartbeat for ${dur(e.silent_s)} (last ${cairo(e.last_heartbeat_at)})`;\n    } else if (e.kind === 'online') {\n      const off = e.offline_since ? Date.parse(e.last_heartbeat_at) - Date.parse(e.offline_since) : 0;\n      text = `🟢 BACK ONLINE · ${who}\\nHeartbeat again at ${cairo(e.last_heartbeat_at)}` + (off > 0 ? ` (offline alert was ${dur(off / 1000)} earlier)` : '');\n    } else continue;\n    out.push({ json: { text, kind: e.kind, hostname: e.hostname, key: e.key } });\n  }\n}\nreturn out;\n"
+      }
+    },
+    {
+      "id": "a6",
+      "name": "Send Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        96
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "name": "Pixtaha Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Alert Webhook": {
+      "main": [
+        [
+          {
+            "node": "Ingest Heartbeat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest Heartbeat": {
+      "main": [
+        [
+          {
+            "node": "Format Telegram Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Check Offline Servers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Offline Servers": {
+      "main": [
+        [
+          {
+            "node": "Format Telegram Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Telegram Messages": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Cairo",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  }
+}

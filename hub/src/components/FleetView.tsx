@@ -143,7 +143,7 @@ export function FleetView({ fleet, loading = false }: { fleet: FleetSnapshot; lo
             </div>
             <div className="chips">{s.workloads.map((w) => <span key={w} className="tag">{w}</span>)}</div>
             <span dir="ltr" className="col-alerts" style={{ fontSize: 13, color: alertsColor(s), fontWeight: s.alertsCritical || s.alertsWarning ? 600 : 400 }}>{alertsText(s)}</span>
-            <span className="end" style={{ fontSize: 13, color: s.status === "offline" ? "var(--color-offline)" : "var(--color-text-subtle)" }}>{ago(s.lastSeenAt, fleet.generatedAt)}</span>
+            <span className="end" title="Last heartbeat" style={{ fontSize: 13, color: s.status === "offline" ? "var(--color-offline)" : "var(--color-text-subtle)" }}>{ago(s.lastSeenAt, fleet.generatedAt)}</span>
           </Link>
         ))}
         {!loading && !empty && rows.length === 0 ? <div className="empty"><p>No servers match these filters.</p></div> : null}
@@ -173,7 +173,7 @@ export function FleetView({ fleet, loading = false }: { fleet: FleetSnapshot; lo
             </div>
             <div className="card-foot">
               <div className="chips">{s.workloads.map((w) => <span key={w} className="tag">{w}</span>)}</div>
-              <span style={{ fontSize: 12, whiteSpace: "nowrap", color: s.status === "offline" ? "var(--color-offline)" : "var(--color-text-subtle)" }}>{ago(s.lastSeenAt, fleet.generatedAt)}</span>
+              <span style={{ fontSize: 12, whiteSpace: "nowrap", color: s.status === "offline" ? "var(--color-offline)" : "var(--color-text-subtle)" }}>Last heartbeat {ago(s.lastSeenAt, fleet.generatedAt)}</span>
             </div>
           </Link>
         ))}

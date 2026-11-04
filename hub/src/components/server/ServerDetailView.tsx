@@ -132,7 +132,7 @@ export function ServerDetailView({ d, now, asReport }: { d: ServerDetail; now: s
             <>
               <span className="heartbeat" style={{ color: offline ? "var(--color-offline)" : undefined }}>
                 {offline ? <StatusIcon status="offline" size={12} /> : <span className="heartbeat-dot" aria-hidden />}
-                {offline ? "Last heartbeat" : "Heartbeat"} {ago(s.last_heartbeat_at, now)} · agent v{report.collector_version}
+                Last heartbeat {ago(s.last_heartbeat_at, now)} · agent v{report.collector_version}
               </span>
               <Link href={`/reports?server=${encodeURIComponent(s.hostname)}`} className="px-btn px-btn--secondary">
                 <Mail size={18} strokeWidth={1.75} aria-hidden /> Reports
