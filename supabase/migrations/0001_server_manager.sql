@@ -108,10 +108,14 @@ begin
   if v_at >= (select max(generated_at) from reports where hostname = v_host) then
     with cur as (
       -- collector 1.0.2+ sends a stable `key`; older payloads fall back to id + title
-      select distinct on (coalesce(a ->> 'key', (a ->> 'id') || '|' || (a ->> 'title')))
-             coalesce(a ->> 'key', (a ->> 'id') || '|' || (a ->> 'title')) as fp,
-             a ->> 'id' as check_id, a ->> 'severity' as severity, a ->> 'title' as title
-      from jsonb_array_elements(coalesce(p -> 'attention', '[]'::jsonb)) a
+      select distinct on (fp) fp, check_id, severity, title
+      from (
+        select coalesce(a ->> 'key', coalesce(a ->> 'id', a ->> 'check', 'unknown') || '|' || coalesce(a ->> 'title', '')) as fp,
+               coalesce(a ->> 'id', a ->> 'check', 'unknown') as check_id,
+               coalesce(a ->> 'severity', 'warning') as severity,
+               coalesce(a ->> 'title', '') as title
+        from jsonb_array_elements(coalesce(p -> 'attention', '[]'::jsonb)) a
+      ) x
     ), up as (
       insert into issues (hostname, fingerprint, check_id, severity, title, first_seen_at, last_seen_at)
       select v_host, fp, check_id, severity, title, v_at, v_at from cur

@@ -153,20 +153,24 @@ export interface ContainersBlock {
 export interface N8nInstance {
   name: string;
   container: string;
-  version: string;
+  /** `null` = not detected. */
+  version: string | null;
   pinned: boolean;
   status: Severity;
-  workflows_active: number;
-  workflows_total: number;
-  executions_ok_24h: number;
-  executions_failed_24h: number;
+  /** Counts are `null` when the collector cannot read them (n8n on Postgres). */
+  workflows_active: number | null;
+  workflows_total: number | null;
+  executions_ok_24h: number | null;
+  executions_failed_24h: number | null;
   db_type: "sqlite" | "postgresdb";
-  db_size_mb: number;
-  db_growth_mb_24h: number;
+  db_size_mb: number | null;
+  db_growth_mb_24h: number | null;
   mem_limit_mb: number | null;
   telegram_webhooks: { bot: string; ok: boolean }[];
-  schedules_missed_24h: number;
-  dead_host_nodes: number;
+  schedules_missed_24h: number | null;
+  dead_host_nodes: number | null;
+  /** Collector note, e.g. "Postgres: counts need DB access". */
+  note?: string | null;
 }
 
 export interface ScriptItem {

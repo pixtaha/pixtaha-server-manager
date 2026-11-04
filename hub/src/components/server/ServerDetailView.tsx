@@ -383,10 +383,10 @@ function n8nIssues(x: N8nInstance): { status: Status; text: string }[] {
   const out: { status: Status; text: string }[] = [];
   const bad = x.telegram_webhooks.filter((t) => !t.ok).length;
   if (bad) out.push({ status: "critical", text: `${x.container}: ${plural(bad, "Telegram webhook")} registered to another URL` });
-  if (x.executions_failed_24h >= 5) out.push({ status: "warning", text: `${x.container}: ${x.executions_failed_24h} failed executions in 24h` });
+  if ((x.executions_failed_24h ?? 0) >= 5) out.push({ status: "warning", text: `${x.container}: ${x.executions_failed_24h} failed executions in 24h` });
   if (x.dead_host_nodes) out.push({ status: "warning", text: `${x.container}: ${plural(x.dead_host_nodes, "HTTP Request node")} call a dead host` });
   if (x.schedules_missed_24h) out.push({ status: "warning", text: `${x.container}: ${plural(x.schedules_missed_24h, "scheduled run")} missed` });
-  if (x.db_type === "sqlite" && (x.db_size_mb > 1024 || x.db_growth_mb_24h > 100)) out.push({ status: "warning", text: `${x.container}: SQLite database is ${mb(x.db_size_mb)}` });
+  if (x.db_type === "sqlite" && ((x.db_size_mb ?? 0) > 1024 || (x.db_growth_mb_24h ?? 0) > 100)) out.push({ status: "warning", text: `${x.container}: SQLite database is ${mb(x.db_size_mb)}` });
   return out;
 }
 
@@ -395,7 +395,7 @@ function N8n({ instances }: { instances: N8nInstance[] }) {
   const flagged = instances.filter((x) => x.status !== "healthy" || n8nIssues(x).length);
   const rows = many ? flagged : instances;
   const issues = instances.flatMap(n8nIssues);
-  const ok = instances.reduce((n, x) => n + x.executions_ok_24h, 0);
+  const ok = instances.reduce((n, x) => n + (x.executions_ok_24h ?? 0), 0);
   const meta = many ? `${plural(instances.length, "instance")} · ${instances.length - flagged.length} healthy · ${num(ok)} executions ok` : plural(instances.length, "instance");
   return (
     <Section title="n8n" id="sec-n8n" flush meta={meta}>
@@ -411,17 +411,23 @@ function N8n({ instances }: { instances: N8nInstance[] }) {
               label: "Version",
               cell: (x) => (
                 <span className="img-cell">
-                  <span dir="ltr" className="mono">{x.version}</span>
+                  <span dir="ltr" className="mono">{x.version ?? "—"}</span>
                   {x.pinned ? null : <Badge tone="warning">latest</Badge>}
                 </span>
               ),
             },
-            { label: "Workflows", cell: (x) => <span dir="ltr">{x.workflows_active} / {x.workflows_total}</span> },
+            { label: "Workflows", cell: (x) => (x.workflows_total == null ? <span className="subtle">—</span> : <span dir="ltr">{num(x.workflows_active)} / {num(x.workflows_total)}</span>) },
             {
               label: "Executions 24h",
               cell: (x) => (
                 <span dir="ltr">
-                  {num(x.executions_ok_24h)} ok · {x.executions_failed_24h >= 5 ? <StatusText status="warning">{x.executions_failed_24h} failed</StatusText> : `${x.executions_failed_24h} failed`}
+                  {x.executions_ok_24h == null ? (
+                    <span className="subtle">Not readable</span>
+                  ) : (
+                    <>
+                      {num(x.executions_ok_24h)} ok · {(x.executions_failed_24h ?? 0) >= 5 ? <StatusText status="warning">{x.executions_failed_24h} failed</StatusText> : `${num(x.executions_failed_24h)} failed`}
+                    </>
+                  )}
                 </span>
               ),
             },
@@ -435,7 +441,7 @@ function N8n({ instances }: { instances: N8nInstance[] }) {
                 return bad ? <StatusText status="critical">{plural(n, "bot")} · {bad} mismatch</StatusText> : <span>{plural(n, "bot")} · webhook OK</span>;
               },
             },
-            { label: "Missed", cell: (x) => <span dir="ltr" style={{ color: x.schedules_missed_24h ? "var(--color-warning)" : undefined }}>{x.schedules_missed_24h}</span> },
+            { label: "Missed", cell: (x) => <span dir="ltr" style={{ color: x.schedules_missed_24h ? "var(--color-warning)" : undefined }}>{x.schedules_missed_24h ?? "—"}</span> },
           ]}
         />
       ) : null}
