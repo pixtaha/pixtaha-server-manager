@@ -1,10 +1,9 @@
 /**
  * Auth contract between the login UI and whatever backs it.
  *
- * Today: `sampleAuth` (sample-adapter.ts), UI only, no real sign-in.
- * Next:  a Supabase adapter (password + TOTP MFA via supabase.auth.mfa.*) plus WebAuthn passkeys
- *        (navigator.credentials.get / create with options from the server). The screens only talk to
- *        this interface, so swapping the adapter needs no UI changes.
+ * `liveAuth` (live-adapter.ts) talks to /api/auth/* (hub-owned accounts in server_manager, passkeys
+ * via WebAuthn, TOTP, backup codes). `sampleAuth` is the UI-only stand-in used when sign-in is not
+ * configured (local previews).
  */
 
 export type AuthError =
@@ -42,9 +41,12 @@ export interface AuthAdapter {
   verifyBackupCode(factorId: string, code: string, opts: { trustDevice: boolean }): Promise<SignInResult>;
 
   // ---- first-time setup
+  /** One-time invite link: creates the admin account with this password and signs in for setup. */
+  acceptInvite(invite: string, password: string): Promise<StepResult>;
   registerPasskey(opts: { authenticator: "platform" | "cross-platform" }): Promise<StepResult>;
   enrollTotp(): Promise<TotpEnrollment>;
   verifyTotpEnrollment(factorId: string, code: string): Promise<StepResult>;
   /** Generates fresh one-time backup codes. Shown once, never stored in the client. */
   createBackupCodes(): Promise<{ codes: string[]; sample: boolean }>;
+  signOut(): Promise<void>;
 }

@@ -1,9 +1,9 @@
 "use client";
 
-import { Bell, LayoutGrid, Mail, Menu, Plus, X } from "lucide-react";
+import { Bell, LayoutGrid, LogOut, Mail, Menu, Plus, X } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AlertsStateProvider, useAlertsState } from "./alerts/AlertsState";
 import { ThemeToggle } from "./ThemeToggle";
 import { Wordmark } from "./Wordmark";
@@ -18,11 +18,16 @@ const NAV = [
 /** Matches the 900px breakpoint in app.css where the sidebar is replaced by the app bar. */
 const MOBILE_QUERY = "(max-width: 900px)";
 
-export function AppShell({ children, openAlertIds }: { children: ReactNode; openAlertIds: string[] }) {
+/** Signed-in account, or null when sign-in is not configured (local preview with sample data). */
+const AccountCtx = createContext<{ email: string } | null>(null);
+
+export function AppShell({ children, openAlertIds, account = null }: { children: ReactNode; openAlertIds: string[]; account?: { email: string } | null }) {
   return (
-    <AlertsStateProvider openIds={openAlertIds}>
-      <Shell>{children}</Shell>
-    </AlertsStateProvider>
+    <AccountCtx.Provider value={account}>
+      <AlertsStateProvider openIds={openAlertIds}>
+        <Shell>{children}</Shell>
+      </AlertsStateProvider>
+    </AccountCtx.Provider>
   );
 }
 
@@ -46,10 +51,24 @@ function NavList({ pathname, label, onNavigate }: { pathname: string; label: str
 }
 
 function Account() {
+  const account = useContext(AccountCtx);
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function signOut() {
+    setBusy(true);
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
+    router.replace("/login");
+    router.refresh();
+  }
   return (
     <div className="account">
-      <span dir="ltr" style={{ fontSize: 13 }}>contact@pixtaha.com</span>
+      <span dir="ltr" style={{ fontSize: 13 }}>{account?.email ?? "contact@pixtaha.com"}</span>
       <span className="subtle" style={{ fontSize: 12 }}>Read-only · Cairo UTC+2</span>
+      {account ? (
+        <button type="button" className="px-btn px-btn--ghost px-btn--sm" style={{ marginTop: 8, alignSelf: "flex-start" }} onClick={signOut} disabled={busy} aria-busy={busy}>
+          <LogOut size={14} strokeWidth={1.75} aria-hidden /> {busy ? "Signing out…" : "Sign out"}
+        </button>
+      ) : null}
     </div>
   );
 }

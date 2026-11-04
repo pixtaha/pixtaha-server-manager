@@ -62,6 +62,10 @@ export const sampleAuth: AuthAdapter = {
     return codeResult(true, false);
   },
 
+  async acceptInvite(_invite, password) {
+    await wait(300);
+    return password.length >= 12 ? { ok: true } : { ok: false, error: { code: "unknown", message: "Use at least 12 characters." } };
+  },
   async registerPasskey() {
     await wait(500);
     if (!hasWebAuthn()) return { ok: false, error: { code: "passkey_unavailable" } };
@@ -78,4 +82,5 @@ export const sampleAuth: AuthAdapter = {
   async createBackupCodes() {
     return { codes: SAMPLE_CODES, sample: true };
   },
+  async signOut() {},
 };
