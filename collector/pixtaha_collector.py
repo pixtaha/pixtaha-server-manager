@@ -37,7 +37,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 SCHEMA = "1.0"
 
 CONFIG_FILE = os.environ.get("PIXTAHA_CONFIG", "/etc/pixtaha-collector/config.env")
@@ -771,6 +771,13 @@ def build_containers(containers, samples, oom_by_id, stats, window_start):
 
 def build_databases(containers, n8n_insts, backups_files):
     dbs = []
+    families = {}
+    for c in containers:
+        if (c.get("State") or {}).get("Status") == "running":
+            repo = split_image((c.get("Config") or {}).get("Image"))[0] or ""
+            if DB_IMAGE.search(repo + ":"):
+                fam = "pg" if re.search(r"postgres|timescale|postgis", repo) else repo.rsplit("/", 1)[-1]
+                families[fam] = families.get(fam, 0) + 1
     for c in containers:
         if (c.get("State") or {}).get("Status") != "running":
             continue
@@ -793,7 +800,9 @@ def build_databases(containers, n8n_insts, backups_files):
                         pass
                 break
         hint = r"(pg|postgres|supabase|dump|\.sql)" if engine in ("Postgres", "Supabase") else re.escape(base)
-        last = newest_matching(backups_files, hint, name)
+        fam = "pg" if engine in ("Postgres", "Supabase") else base
+        project = ((c.get("Config") or {}).get("Labels") or {}).get("com.docker.compose.project")
+        last = newest_for(backups_files, name_tokens(name, project), hint, families.get(fam, 0) == 1)
         dbs.append({
             "name": name, "engine": engine, "version": tag if tag not in (None, "latest", "digest") else None,
             "status": "info" if (engine == "Redis" and last is None) else backup_sev(last), "size_mb": size, "growth_mb_24h": None,
@@ -802,7 +811,8 @@ def build_databases(containers, n8n_insts, backups_files):
     for inst in n8n_insts:
         if inst["db_type"] != "sqlite" or inst["db_size_mb"] is None:
             continue
-        last = newest_matching(backups_files, r"n8n", inst["name"], [i["name"] for i in n8n_insts])
+        sqlite_count = sum(1 for i in n8n_insts if i["db_type"] == "sqlite")
+        last = newest_for(backups_files, name_tokens(inst["name"]), r"n8n", sqlite_count == 1)
         sev = backup_sev(last)
         if inst["db_size_mb"] > 1024:
             sev = worst([sev, "warning"])
@@ -821,22 +831,34 @@ def backup_sev(last):
     return "healthy" if h <= 48 else ("warning" if h <= 168 else "critical")
 
 
-def newest_matching(files, hint, name, others=()):
-    """files: [(path, mtime_dt, size)]. Prefer files naming this container; else generic files
-    matching `hint` that do not name another container."""
-    norm = lambda x: re.sub(r"[^a-z0-9]+", "", x.lower())
-    short = norm(name)
-    other = [norm(o) for o in others if norm(o) and norm(o) != short]
+GENERIC_WORDS = {"postgres", "postgresql", "database", "data", "redis", "valkey", "mysql", "mariadb", "mongo",
+                 "mongodb", "server", "main", "prod", "production", "docker", "compose", "default", "sqlite",
+                 "backup", "backups", "n8n", "new", "old", "service"}
+
+
+def name_tokens(*names):
+    """Distinctive words of a container / compose project name, e.g. 'n8n-new-samier' -> {'samier'}."""
+    out = set()
+    for n in names:
+        for t in re.split(r"[^a-z0-9]+", (n or "").lower()):
+            if len(t) >= 4 and t not in GENERIC_WORDS:
+                out.add(t)
+    return out
+
+
+def newest_for(files, tokens, hint, allow_generic):
+    """files: [(path, mtime_dt, size)]. A backup belongs to a database when its path names the database
+    (container or compose project). A generic match (e.g. any *.sql) is used only when the host has a
+    single database of that kind, so one database's backup is never credited to another."""
     best = None
     for path, mt, _ in files:
-        if short and short in norm(os.path.basename(path)) and (best is None or mt > best):
+        low = path.lower()
+        if tokens and any(t in low for t in tokens) and (best is None or mt > best):
             best = mt
-    if best:
-        return best
-    for path, mt, _ in files:
-        base = norm(os.path.basename(path))
-        if re.search(hint, path.lower()) and not any(o in base for o in other) and (best is None or mt > best):
-            best = mt
+    if best is None and allow_generic:
+        for path, mt, _ in files:
+            if re.search(hint, path.lower()) and (best is None or mt > best):
+                best = mt
     return best
 
 
