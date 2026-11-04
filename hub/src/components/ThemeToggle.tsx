@@ -10,9 +10,17 @@ const KEY = "pm-theme";
 export function ThemeToggle({ large = false }: { large?: boolean }) {
   const [theme, setTheme] = useState<Theme>("dark");
 
+  // Stay in sync with the document, so the sidebar and the mobile menu toggles always agree.
   useEffect(() => {
-    const current = document.documentElement.getAttribute("data-theme");
-    if (current === "light" || current === "dark") setTheme(current);
+    const root = document.documentElement;
+    const sync = () => {
+      const current = root.getAttribute("data-theme");
+      if (current === "light" || current === "dark") setTheme(current);
+    };
+    sync();
+    const obs = new MutationObserver(sync);
+    obs.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
   }, []);
 
   const flip = () => {
