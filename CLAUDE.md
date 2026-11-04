@@ -1,0 +1,36 @@
+# Pixtaha Server Manager
+
+Read-only monitoring for a fleet of 30+ Linux servers across 10+ clients, branded "Pixtaha Management".
+Owner: Taha (Pixtaha). Talk to him in Egyptian Arabic; everything in the repo is English only.
+
+## Layout
+- `hub/` Next.js 16 dashboard (App Router, TypeScript), deployed by Vercel from `main` (project `pixtaha-server-manager`, root `hub`).
+- `email/` daily report email builder used by the n8n Code node "Build Report Email".
+- `docs/report/payload-v1.md` the payload contract: collector -> n8n webhook -> email, and later -> Supabase -> hub.
+- `docs/kickoff/` original brief, project instructions, server discovery prompt.
+
+## Hard rules
+- **This repo is PUBLIC.** Never commit real server data: hostnames of client servers, IPs, open ports, domains of client systems, server files, example payloads with real values, tokens. Sample data stays fictional (`hub/src/lib/sample-data.ts`).
+- Never print or commit secrets. Env vars by NAME only (`hub/.env.example`); values live in Vercel / n8n credentials.
+- All code, comments, commits, docs and prompts in English.
+- Pin dependency versions (exact versions in package.json).
+- The agent/collector is read-only on servers: it never changes anything.
+
+## Design
+- Pixtaha Design System tokens in `hub/src/styles/tokens.css` (from the Claude Design export). Do not invent colors or fonts.
+- Dark is primary, light must work. Status is always icon + text label, never color alone.
+- Logical CSS properties only (`inline-start/end`) so Arabic RTL mirrors later. Numbers, versions and IPs stay LTR.
+- Desktop first; every screen must work at 375px.
+- Fonts are self-hosted with @fontsource (no Google Fonts at build time).
+
+## Hub roadmap
+1. Fleet overview — done (sample data).
+2. Server detail: health header, 24h charts, containers table, services, domains/TLS, exposed ports, security, backups, changes timeline.
+3. Alerts center: open / acknowledged / resolved, grouped duplicates, bulk acknowledge.
+4. Add server: name, client, env, one-line install command, waiting-for-heartbeat state.
+5. Login: passkey first, fallback password + TOTP (Google Authenticator), backup codes, rate limiting.
+6. Data: Supabase schema `server_manager` on the self-hosted Supabase, RLS, replace `getFleet()` in `hub/src/lib/data.ts`.
+
+## Checks before every push
+- `cd hub && npx tsc --noEmit && npx next build`
+- `git grep` for real IPs, client hostnames or tokens before committing.
