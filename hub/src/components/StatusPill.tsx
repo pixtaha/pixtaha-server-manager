@@ -1,7 +1,7 @@
-import { STATUS_LABEL, type Status } from "@/lib/types";
+import { STATUS_LABEL, type Severity, type Status } from "@/lib/types";
 
 /** Status always shows icon + text label, never colour alone. Icons follow the Claude Design Status Pill. */
-function StatusIcon({ status, size }: { status: Status; size: number }) {
+export function StatusIcon({ status, size }: { status: Status; size: number }) {
   const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
   switch (status) {
     case "critical":
@@ -15,11 +15,18 @@ function StatusIcon({ status, size }: { status: Status; size: number }) {
   }
 }
 
-export function StatusPill({ status, size = "md" }: { status: Status; size?: "sm" | "md" }) {
+/** `label` overrides the text (e.g. a container state), the icon still follows the status. */
+export function StatusPill({ status, size = "md", label }: { status: Status; size?: "sm" | "md"; label?: string }) {
   return (
     <span role="status" className={`pill pill--${status}${size === "sm" ? " pill--sm" : ""}`}>
       <StatusIcon status={status} size={size === "sm" ? 12 : 14} />
-      {STATUS_LABEL[status]}
+      {label ?? STATUS_LABEL[status]}
     </span>
   );
+}
+
+/** Payload v1 severities map onto the four hub statuses. `info` reads as healthy, `unknown` as offline. */
+export function sevStatus(sev: Severity): Status {
+  if (sev === "critical" || sev === "warning" || sev === "offline") return sev;
+  return sev === "unknown" ? "offline" : "healthy";
 }

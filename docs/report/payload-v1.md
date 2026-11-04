@@ -36,6 +36,8 @@ Contract between the collector on each server, the n8n workflow "Server Manager"
 | `kpis.ram_used_mb` + `server.ram_total_mb` | RAM tile |
 | `kpis.disk_used_pct`, `kpis.disk_used_gb`, `server.disk_total_gb`, `kpis.disk_days_until_full` | Disk tile (`null` days = "No growth trend yet") |
 | `server.uptime_seconds` | Uptime tile |
+| `kpis.ram_hourly_pct`, `kpis.disk_hourly_pct` (optional) | 24 hourly values for the hub Memory and Disk charts (oldest first, `null` = no data) |
+| `kpis.ram_peak_pct` (optional) | RAM peak shown on the hub RAM tile |
 | `blocks.systemd_units` | `{running, failed}` line under Scripts and services |
 | `note` (optional, top level) | overrides the generated manager note |
 
