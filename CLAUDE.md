@@ -8,6 +8,7 @@ Owner: Taha (Pixtaha). Talk to him in Egyptian Arabic; everything in the repo is
 - `email/` daily report email builder used by the n8n Code node "Build Report Email".
 - `docs/report/payload-v1.md` the payload contract: collector -> n8n webhook -> email, and later -> Supabase -> hub.
 - `docs/kickoff/` original brief, project instructions, server discovery prompt.
+- `docs/design/` sanitized Claude Design export: source markup for Fleet, Server detail, Alerts, Add server and Login. Port screens from here.
 
 ## Hard rules
 - **This repo is PUBLIC.** Never commit real server data: hostnames of client servers, IPs, open ports, domains of client systems, server files, example payloads with real values, tokens. Sample data stays fictional (`hub/src/lib/sample-data.ts`).
@@ -25,7 +26,7 @@ Owner: Taha (Pixtaha). Talk to him in Egyptian Arabic; everything in the repo is
 
 ## Hub roadmap
 1. Fleet overview — done (sample data).
-2. Server detail: health header, 24h charts, containers table, services, domains/TLS, exposed ports, security, backups, changes timeline.
+2. Server detail — done (sample data).
 3. Alerts center: open / acknowledged / resolved, grouped duplicates, bulk acknowledge.
 4. Add server: name, client, env, one-line install command, waiting-for-heartbeat state.
 5. Login: passkey first, fallback password + TOTP (Google Authenticator), backup codes, rate limiting.

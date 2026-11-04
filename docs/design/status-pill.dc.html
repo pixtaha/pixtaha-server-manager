@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/pixtaha-design-system-9866b6ad-c65c-403d-bcae-aebf6aa6db08/styles.css">
+  <link rel="stylesheet" href="pm-tokens.css">
+</helmet>
+<sc-if value="{{ s.critical }}" hint-placeholder-val="{{ false }}">
+  <span role="status" style="display:inline-flex;align-items:center;gap:6px;height:{{ h }};padding-inline:{{ pad }};border-radius:999px;background:{{ bgC }};color:var(--color-critical);font-family:var(--font-sans);font-size:{{ fs }};font-weight:600;white-space:nowrap;line-height:1">
+    <svg width="{{ ic }}" height="{{ ic }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 21.5 12 12 21.5 2.5 12z"></path><path d="M12 8v4.5"></path><path d="M12 16h.01"></path></svg>{{ label }}</span>
+</sc-if>
+<sc-if value="{{ s.warning }}" hint-placeholder-val="{{ false }}">
+  <span role="status" style="display:inline-flex;align-items:center;gap:6px;height:{{ h }};padding-inline:{{ pad }};border-radius:999px;background:{{ bgW }};color:var(--color-warning);font-family:var(--font-sans);font-size:{{ fs }};font-weight:600;white-space:nowrap;line-height:1">
+    <svg width="{{ ic }}" height="{{ ic }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>{{ label }}</span>
+</sc-if>
+<sc-if value="{{ s.offline }}" hint-placeholder-val="{{ false }}">
+  <span role="status" style="display:inline-flex;align-items:center;gap:6px;height:{{ h }};padding-inline:{{ pad }};border-radius:999px;background:{{ bgO }};color:var(--color-offline);font-family:var(--font-sans);font-size:{{ fs }};font-weight:600;white-space:nowrap;line-height:1">
+    <svg width="{{ ic }}" height="{{ ic }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"></circle><path d="m5.3 5.3 13.4 13.4"></path></svg>{{ label }}</span>
+</sc-if>
+<sc-if value="{{ s.healthy }}" hint-placeholder-val="{{ false }}">
+  <span role="status" style="display:inline-flex;align-items:center;gap:6px;height:{{ h }};padding-inline:{{ pad }};border-radius:999px;background:{{ bgH }};color:var(--color-healthy);font-family:var(--font-sans);font-size:{{ fs }};font-weight:600;white-space:nowrap;line-height:1">
+    <svg width="{{ ic }}" height="{{ ic }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"></circle><path d="m8.5 12 2.5 2.5 4.5-5"></path></svg>{{ label }}</span>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:120,&quot;height&quot;:40},&quot;status&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;critical&quot;,&quot;warning&quot;,&quot;offline&quot;,&quot;healthy&quot;],&quot;default&quot;:&quot;healthy&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sm&quot;,&quot;md&quot;],&quot;default&quot;:&quot;md&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;pill&quot;,&quot;plain&quot;],&quot;default&quot;:&quot;pill&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;label&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.props.status ?? 'healthy';
+    const size = this.props.size ?? 'md';
+    const plain = (this.props.variant ?? 'pill') === 'plain';
+    const L = { critical: 'Critical', warning: 'Warning', offline: 'Offline', healthy: 'Healthy' };
+    const sm = size === 'sm';
+    return {
+      s: { [st]: true }, label: this.props.label ?? L[st],
+      h: plain ? 'auto' : (sm ? '22px' : '28px'), pad: plain ? '0' : (sm ? '8px' : '10px'), fs: sm ? '12px' : '13px', ic: sm ? 12 : 14,
+      bgC: plain ? 'transparent' : 'var(--color-critical-soft)', bgW: plain ? 'transparent' : 'var(--color-warning-soft)', bgO: plain ? 'transparent' : 'var(--color-offline-soft)', bgH: plain ? 'transparent' : 'var(--color-healthy-soft)'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+/* Pixtaha Management — token additions on top of Pixtaha Design System (status scale needs Warning + Offline). */
+:root,[data-theme="light"]{
+--text-body:var(--color-text);--text-heading:var(--color-text);--text-label:var(--color-text);--surface-page:var(--color-bg);--surface-card:var(--color-surface);--surface-input:var(--color-surface);--border-hairline:var(--color-border);
+--color-warning:#8F5B00;--color-warning-soft:#F8EED9;
+--color-offline:#5F544C;--color-offline-soft:#F3EDE6;
+--color-critical:var(--color-danger);--color-critical-soft:var(--color-danger-soft);
+--color-healthy:var(--color-success);--color-healthy-soft:var(--color-success-soft);
+}
+[data-theme="dark"]{
+--text-body:var(--color-text);--text-heading:var(--color-text);--text-label:var(--color-text);--surface-page:var(--color-bg);--surface-card:var(--color-surface);--surface-input:var(--color-surface);--border-hairline:var(--color-border);
+--color-warning:#E2B254;--color-warning-soft:rgba(226,178,84,.12);
+--color-offline:#B8AEA6;--color-offline-soft:rgba(184,174,166,.10);
+--color-critical:var(--color-danger);--color-critical-soft:var(--color-danger-soft);
+--color-healthy:var(--color-success);--color-healthy-soft:var(--color-success-soft);
+}

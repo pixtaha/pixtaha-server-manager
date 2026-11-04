@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas">
+  <link rel="stylesheet" href="_ds/pixtaha-design-system-9866b6ad-c65c-403d-bcae-aebf6aa6db08/styles.css">
+  <link rel="stylesheet" href="pm-tokens.css">
+  
+  <style>body{margin:0;background:var(--color-surface-sunken)}a{color:var(--color-primary)}a:hover{color:var(--color-primary-hover)}</style>
+</helmet>
+<div style="padding:64px;font-family:var(--font-sans);color:var(--color-text);display:flex;flex-direction:column;gap:56px;min-width:max-content">
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:760px">
+    <div style="font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em;color:var(--color-text-subtle)">PIXTAHA MANAGEMENT · DELIVERABLES 3–4</div>
+    <h1 style="margin:0;font-size:44px;line-height:1.12;font-weight:400;letter-spacing:-0.025em">Dashboard</h1>
+    <p style="margin:0;font-size:16px;line-height:1.6;color:var(--color-text-muted)">Each frame is live: status chips filter, search works, rows open the server, alerts select and acknowledge, the theme toggle flips light/dark.</p>
+  </div>
+  <sc-for list="{{ rows }}" as="row" hint-placeholder-count="4">
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <div style="font-size:20px;font-weight:500">{{ row.title }}</div>
+      <div style="display:flex;gap:40px;align-items:flex-start">
+        <sc-for list="{{ row.items }}" as="it" hint-placeholder-count="2">
+          <div id="{{ it.id }}" style="display:flex;flex-direction:column;gap:12px;flex:none;width:{{ it.w }}">
+            <div style="display:flex;gap:10px;align-items:center"><span style="padding:4px 10px;border-radius:999px;background:var(--color-text);color:var(--color-bg);font-family:var(--font-mono);font-size:12px">{{ it.id }}</span><span style="font-size:15px;color:var(--color-text-muted)">{{ it.name }}</span></div>
+            <div style="width:{{ it.w }};height:{{ it.h }};border-radius:16px;overflow:hidden;border:1px solid var(--color-border)">
+              <dc-import name="Dashboard App" page="{{ it.page }}" theme="{{ it.theme }}" device="{{ it.device }}" state="{{ it.state }}" add-step="{{ it.step }}" hint-size="100%,100%" style="width:100%;height:100%"></dc-import>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-for>
+
+  <div id="T1" style="display:flex;flex-direction:column;gap:20px">
+    <div style="font-size:20px;font-weight:500">Telegram alert preview</div>
+    <div style="display:flex;gap:40px;align-items:flex-start">
+      <div data-theme="dark" style="width:390px;border-radius:24px;overflow:hidden;border:1px solid var(--color-border);background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans)">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--color-border);background:var(--color-surface)">
+          <span style="width:40px;height:40px;border-radius:50%;background:var(--color-surface-raised);border:1px solid var(--color-border-strong);display:grid;place-items:center;font-weight:500;color:var(--color-brand)">P</span>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:500;font-size:15px">Pixtaha Management</span><span style="font-size:12px;color:var(--color-text-subtle)">bot</span></div>
+        </div>
+        <div style="padding:24px 12px 16px;display:flex;flex-direction:column;gap:6px;background:var(--color-surface-sunken)">
+          <span style="align-self:center;font-size:12px;color:var(--color-text-subtle);padding-bottom:8px">Today</span>
+          <div style="max-width:320px;padding:14px 16px 10px;border-radius:16px 16px 16px 6px;background:var(--color-surface);border:1px solid var(--color-border);display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.5">
+            <span style="display:flex;align-items:center;gap:6px;color:var(--color-critical);font-weight:600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5 21.5 12 12 21.5 2.5 12z"></path><path d="M12 8v4.5"></path><path d="M12 16h.01"></path></svg>Critical · <span dir="ltr">core-01</span></span>
+            <span style="font-weight:600">Database ports 5432 / 6543 are public</span>
+            <span style="color:var(--color-text-muted)">supabase-pooler is reachable from any IP. 312 failed auth attempts on 5432 in 24h.</span>
+            <span style="color:var(--color-text-muted)"><span style="color:var(--color-text-subtle)">Do:</span> bind the pooler to 127.0.0.1.</span>
+            <span style="font-size:12px;color:var(--color-text-subtle)">Pixtaha · production · first seen 14:02 Cairo</span>
+            <span style="align-self:flex-end;font-size:11px;color:var(--color-text-subtle)">09:02</span>
+          </div>
+          <div style="max-width:320px;display:grid;grid-template-columns:1fr 1fr;gap:4px">
+            <button type="button" style="height:44px;border:0;border-radius:10px;background:var(--color-surface-raised);color:var(--color-text);font:inherit;font-size:14px;font-weight:500">Acknowledge</button>
+            <button type="button" style="height:44px;border:0;border-radius:10px;background:var(--color-surface-raised);color:var(--color-text);font:inherit;font-size:14px;font-weight:500">Mute 1h</button>
+            <button type="button" style="grid-column:span 2;height:44px;border:0;border-radius:10px;background:var(--color-surface-raised);color:var(--color-primary);font:inherit;font-size:14px;font-weight:500">Open in dashboard</button>
+          </div>
+          <div style="max-width:300px;margin-top:10px;padding:10px 14px;border-radius:16px 16px 16px 6px;background:var(--color-surface);border:1px solid var(--color-border);font-size:13px;color:var(--color-text-muted)">Acknowledged by contact@pixtaha.com · repeats silenced until the check changes.</div>
+        </div>
+      </div>
+      <p style="margin:0;max-width:320px;font-size:14px;line-height:1.6;color:var(--color-text-muted)">One message per new alert, not per occurrence. Buttons edit the message in place after use. Rendering in the Telegram app follows the user's Telegram theme; this shows content and button order.</p>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const f = (id, name, o) => ({ id, name, page: 'fleet', theme: 'dark', device: 'desktop', state: 'populated', step: 'waiting', w: '1440px', h: '1620px', ...o });
+    return { rows: [
+      { title: 'Fleet overview · 1440', items: [f('F1', 'Dark · populated · one agent offline'), f('F2', 'Light', { theme: 'light' })] },
+      { title: 'Fleet states · 1440 dark', items: [f('F3', 'Loading skeleton', { state: 'loading', h: '900px' }), f('F4', 'Empty fleet', { state: 'empty', h: '900px' }), f('F5', 'Mobile 375 dark', { device: 'mobile', w: '375px', h: '2820px' })] },
+      { title: 'Server detail · Alerts center · 1440 dark', items: [f('D1', 'Server detail · lens-studio', { page: 'detail', h: '2900px' }), f('A1', 'Alerts center · group expanded', { page: 'alerts', h: '1000px' })] },
+      { title: 'Add server · 1440 dark', items: [f('N1', 'Waiting for first heartbeat', { page: 'add', h: '820px' }), f('N2', 'Connected', { page: 'add', step: 'success', h: '820px' })] }
+    ] };
+  }
+}
+</script>
+</body>
+</html>

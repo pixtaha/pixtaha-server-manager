@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/pixtaha-design-system-9866b6ad-c65c-403d-bcae-aebf6aa6db08/styles.css">
+  <link rel="stylesheet" href="pm-tokens.css">
+  
+  <script src="email/report-email.js"></script>
+  <style>@keyframes pm-pulse{0%,100%{opacity:.55}50%{opacity:1}}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="width:100%;height:100%;overflow:auto;background:var(--color-bg);color:var(--color-text);font-family:var(--font-sans);font-size:14px">
+
+<sc-if value="{{ desktop }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100%">
+  <aside style="border-inline-end:1px solid var(--color-border);padding:24px 16px;display:flex;flex-direction:column;gap:28px;box-sizing:border-box;background:var(--color-bg)">
+    <div dir="ltr" style="display:flex;align-items:baseline;gap:6px;padding-inline:8px;white-space:nowrap"><x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Wordmark" size="18" hint-size="70px,22px"></x-import><span style="font-size:15px;color:var(--color-text-muted)">Management</span></div>
+    <nav style="display:flex;flex-direction:column;gap:2px">
+      <sc-for list="{{ nav }}" as="n" hint-placeholder-count="4">
+        <button type="button" onClick="{{ n.go }}" aria-current="{{ n.cur }}" style="display:flex;align-items:center;gap:10px;height:40px;padding-inline:10px;border:0;border-radius:10px;background:{{ n.bg }};color:{{ n.fg }};font:inherit;font-size:14px;font-weight:500;cursor:pointer;text-align:start" style-hover="background:var(--color-surface-sunken)">
+          <x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Icon" name="{{ n.icon }}" size="18" hint-size="18px,18px"></x-import>
+          <span style="flex:1">{{ n.label }}</span>
+          <sc-if value="{{ n.count }}" hint-placeholder-val="{{ false }}"><span style="min-width:22px;height:20px;padding:0 6px;border-radius:999px;background:var(--color-critical-soft);color:var(--color-critical);font-size:12px;font-weight:600;display:inline-grid;place-items:center;box-sizing:border-box">{{ n.count }}</span></sc-if>
+        </button>
+      </sc-for>
+    </nav>
+    <div style="margin-top:auto;display:flex;flex-direction:column;gap:12px;padding:12px;border:1px solid var(--color-border);border-radius:var(--radius-card)">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:var(--color-text-muted)">Theme</span>
+        <button type="button" onClick="{{ toggleTheme }}" aria-label="Toggle theme" style="width:32px;height:32px;border-radius:999px;border:1px solid var(--color-border-strong);background:transparent;color:var(--color-text);display:grid;place-items:center;cursor:pointer"><x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Icon" name="{{ themeIcon }}" size="16" hint-size="16px,16px"></x-import></button></div>
+      <div style="display:flex;flex-direction:column;gap:2px"><span dir="ltr" style="font-size:13px">contact@pixtaha.com</span><span style="font-size:12px;color:var(--color-text-subtle)">Read-only · Cairo UTC+2</span></div>
+    </div>
+  </aside>
+
+  <main style="min-width:0;padding:32px 40px 64px;display:flex;flex-direction:column;gap:28px">
+
+    <sc-if value="{{ pg.fleet }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:32px;line-height:1.15;font-weight:420;letter-spacing:-0.025em">Fleet</h1><span style="color:var(--color-text-muted);white-space:nowrap">Wed 4 Nov · 09:14 Cairo · refreshed every 30 s</span></div>
+          <x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Button" icon-start="plus" on-click="{{ goAdd }}" hint-size="140px,44px">Add server</x-import>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface)">
+          <sc-for list="{{ summary }}" as="s" hint-placeholder-count="5">
+            <div style="padding:18px 20px;display:flex;flex-direction:column;gap:6px;border-inline-start:{{ s.bd }}">
+              <span style="font-size:13px;color:var(--color-text-muted)">{{ s.label }}</span>
+              <span dir="ltr" style="font-size:28px;line-height:1.1;letter-spacing:-0.02em;color:{{ s.c }};white-space:nowrap">{{ s.v }}</span><span style="font-size:13px;color:var(--color-text-subtle);white-space:nowrap">{{ s.sub }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:8px;height:40px;padding-inline:14px;border:1px solid var(--color-border-strong);border-radius:999px;background:var(--color-surface);width:280px;box-sizing:border-box;color:var(--color-text-subtle)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+            <input value="{{ q }}" onChange="{{ onQ }}" placeholder="Search servers, clients, IPs" style="flex:1;min-width:0;border:0;outline:0;background:transparent;font:inherit;color:var(--color-text)">
+          </label>
+          <sc-for list="{{ selects }}" as="f" hint-placeholder-count="2">
+            <button type="button" style="display:flex;align-items:center;gap:6px;height:40px;padding-inline:14px 10px;border:1px solid var(--color-border-strong);border-radius:999px;background:transparent;color:var(--color-text);font:inherit;cursor:pointer"><span style="color:var(--color-text-muted)">{{ f.k }}</span> {{ f.v }}<x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Icon" name="chevronDown" size="16" hint-size="16px,16px"></x-import></button>
+          </sc-for>
+          <div style="width:1px;height:24px;background:var(--color-border)"></div>
+          <sc-for list="{{ chips }}" as="c" hint-placeholder-count="4">
+            <button type="button" onClick="{{ c.toggle }}" aria-pressed="{{ c.on }}" style="display:flex;align-items:center;gap:8px;height:36px;padding-inline:12px;border:1px solid {{ c.bd }};border-radius:999px;background:{{ c.bg }};color:var(--color-text);font:inherit;font-size:13px;cursor:pointer">{{ c.label }} <span dir="ltr" style="color:var(--color-text-subtle)">{{ c.n }}</span></button>
+          </sc-for>
+          <span style="margin-inline-start:auto;display:flex;align-items:center;gap:6px;color:var(--color-text-muted);font-size:13px;white-space:nowrap">Sort <strong style="font-weight:500;color:var(--color-text)">Severity</strong><x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Icon" name="chevronDown" size="16" hint-size="16px,16px"></x-import></span>
+        </div>
+
+        <div style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface);overflow:hidden">
+          <div style="display:grid;grid-template-columns:{{ cols }};gap:16px;padding:12px 20px;border-bottom:1px solid var(--color-border);font-size:12px;color:var(--color-text-subtle)">
+            <span>Server</span><span>Status</span><span>Resources</span><span>Workloads</span><span>Alerts</span><span style="text-align:end">Heartbeat</span>
+          </div>
+          <sc-if value="{{ st.loading }}" hint-placeholder-val="{{ false }}">
+            <sc-for list="{{ skel }}" as="k" hint-placeholder-count="6">
+              <div style="display:grid;grid-template-columns:{{ cols }};gap:16px;padding:18px 20px;border-top:1px solid var(--color-border);align-items:center;animation:pm-pulse 1.6s ease-in-out infinite">
+                <div style="display:flex;flex-direction:column;gap:8px"><div style="height:12px;width:60%;border-radius:6px;background:var(--color-surface-sunken)"></div><div style="height:10px;width:40%;border-radius:6px;background:var(--color-surface-sunken)"></div></div>
+                <div style="height:22px;width:80px;border-radius:999px;background:var(--color-surface-sunken)"></div>
+                <div style="display:flex;flex-direction:column;gap:6px"><div style="height:6px;border-radius:3px;background:var(--color-surface-sunken)"></div><div style="height:6px;border-radius:3px;background:var(--color-surface-sunken)"></div><div style="height:6px;border-radius:3px;background:var(--color-surface-sunken)"></div></div>
+                <div style="display:flex;gap:6px"><div style="height:22px;width:60px;border-radius:999px;background:var(--color-surface-sunken)"></div><div style="height:22px;width:70px;border-radius:999px;background:var(--color-surface-sunken)"></div></div>
+                <div style="height:10px;width:30px;border-radius:6px;background:var(--color-surface-sunken)"></div>
+                <div style="height:10px;width:50px;border-radius:6px;background:var(--color-surface-sunken);justify-self:end"></div>
+              </div>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{ st.empty }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:72px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center">
+              <div style="width:56px;height:56px;border-radius:50%;border:1px solid var(--color-border-strong);display:grid;place-items:center;color:var(--color-text-muted)"><x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Icon" name="table" size="22" hint-size="22px,22px"></x-import></div>
+              <div style="font-size:22px;font-weight:420;letter-spacing:-0.015em;white-space:nowrap">No servers yet</div>
+              <p style="margin:0;max-width:420px;color:var(--color-text-muted);line-height:1.6">Install the agent on your first server. It reports within a minute and your first daily report goes out at 09:00 Cairo.</p>
+              <x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Button" icon-start="plus" on-click="{{ goAdd }}" hint-size="150px,44px">Add your first server</x-import>
+            </div>
+          </sc-if>
+          <sc-if value="{{ st.populated }}" hint-placeholder-val="{{ true }}">
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="12">
+              <div role="button" tabindex="0" onClick="{{ r.open }}" style="display:grid;grid-template-columns:{{ cols }};gap:16px;padding:14px 20px;border-top:1px solid var(--color-border);align-items:center;cursor:pointer;opacity:{{ r.op }}" style-hover="background:var(--color-surface-sunken)">
+                <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+                  <span dir="ltr" style="font-weight:500;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+                  <span style="display:flex;align-items:center;gap:8px;min-width:0"><span style="flex:none;padding:0 7px;border:1px solid var(--color-border-strong);border-radius:999px;font-size:11px;line-height:18px;color:var(--color-text-muted)">{{ r.env }}</span><span style="font-size:13px;color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.client }}</span></span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+                  <dc-import name="Status Pill" status="{{ r.status }}" size="sm" hint-size="80px,22px"></dc-import>
+                  <span style="font-size:12px;color:{{ r.noteC }};white-space:nowrap">{{ r.note }}</span>
+                </div>
+                <div dir="ltr" style="display:flex;flex-direction:column;gap:5px">
+                  <sc-for list="{{ r.bars }}" as="b" hint-placeholder-count="3">
+                    <div style="display:grid;grid-template-columns:34px minmax(0,1fr) 34px;gap:8px;align-items:center;font-size:11px;color:var(--color-text-subtle)">
+                      <span>{{ b.k }}</span>
+                      <div style="height:5px;border-radius:3px;background:var(--color-surface-sunken);overflow:hidden"><div style="height:100%;width:{{ b.w }};background:{{ b.c }};border-radius:3px"></div></div>
+                      <span style="font-family:var(--font-mono);text-align:end;color:{{ b.tc }}">{{ b.v }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                  <sc-for list="{{ r.chips }}" as="c" hint-placeholder-count="2"><span style="padding:3px 9px;border-radius:999px;background:var(--color-surface-sunken);font-size:12px;color:var(--color-text-muted);white-space:nowrap">{{ c }}</span></sc-for>
+                </div>
+                <div style="display:flex;gap:10px;font-size:13px" dir="ltr">
+                  <span style="color:{{ r.ac }};font-weight:{{ r.aw }}">{{ r.alerts }}</span>
+                </div>
+                <span style="text-align:end;font-size:13px;color:{{ r.hbC }}">{{ r.hb }}</span>
+              </div>
+            </sc-for>
+          </sc-if>
+        </div>
+        <sc-if value="{{ st.populated }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px;color:var(--color-text-subtle)">Servers other than lens-studio, core-01, flows-platform and facility-ops use sample data.</span></sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ pg.detail }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;gap:8px;font-size:13px;color:var(--color-text-muted)"><button type="button" onClick="{{ goFleet }}" style="border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer" style-hover="color:var(--color-primary)">Fleet</button><span>/</span><span dir="ltr" style="color:var(--color-text)">lens-studio</span></div>
+        <div style="display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:flex-start">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:14px"><h1 dir="ltr" style="margin:0;font-size:40px;line-height:1.1;font-weight:420;letter-spacing:-0.03em">lens-studio</h1><dc-import name="Status Pill" status="warning" hint-size="96px,28px"></dc-import></div>
+            <div style="display:flex;gap:10px;align-items:center;color:var(--color-text-muted);flex-wrap:wrap;white-space:nowrap"><span>Lens Studio</span><span style="padding:1px 8px;border:1px solid var(--color-border-strong);border-radius:999px;font-size:12px">production</span><span dir="ltr" style="font-family:var(--font-mono);font-size:13px">203.0.113.20</span><span>·</span><span>2 cores · 7.8 GB RAM · Ubuntu 24.04</span></div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <span style="font-size:13px;color:var(--color-text-subtle);display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--color-healthy)"></span>Heartbeat 11s ago · agent v0.1</span>
+            <x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Button" variant="secondary" icon-start="mail" hint-size="170px,44px">Today's report</x-import>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+          <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+            <div style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface);padding:18px 20px;display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:13px;color:var(--color-text-muted)">{{ k.label }}</span>
+              <span dir="ltr" style="font-size:26px;letter-spacing:-0.02em;line-height:1.1">{{ k.v }}</span>
+              <span style="font-size:13px;color:var(--color-text-subtle)">{{ k.sub }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+          <sc-for list="{{ charts }}" as="c" hint-placeholder-count="3">
+            <div style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface);padding:18px 20px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-weight:500">{{ c.title }}</span><span dir="ltr" style="font-size:13px;color:var(--color-text-muted)">{{ c.meta }}</span></div>
+              <svg viewBox="0 0 300 100" preserveAspectRatio="none" style="width:100%;height:120px;display:block;overflow:visible" aria-label="{{ c.title }}">
+                <path d="M0 25H300M0 50H300M0 75H300" stroke="var(--color-border)" stroke-width="1" vector-effect="non-scaling-stroke"></path>
+                <path d="{{ c.area }}" fill="var(--color-glow)"></path>
+                <path d="{{ c.line }}" fill="none" stroke="var(--color-primary)" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"></path>
+              </svg>
+              <div dir="ltr" style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;color:var(--color-text-subtle)"><span>09:00</span><span>15:00</span><span>21:00</span><span>03:00</span><span>09:00</span></div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start">
+          <div style="display:flex;flex-direction:column;gap:24px;min-width:0">
+            <section style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface)">
+              <div style="display:flex;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--color-border)"><h2 style="margin:0;font-size:17px;font-weight:500">Needs attention</h2><span style="color:var(--color-text-muted);font-size:13px">4 open · most severe first</span></div>
+              <sc-for list="{{ att }}" as="a" hint-placeholder-count="4">
+                <div style="display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:4px 12px;padding:16px 20px;border-top:{{ a.bd }}">
+                  <span style="font-family:var(--font-mono);font-size:12px;color:var(--color-text-subtle);padding-top:3px">{{ a.n }}</span>
+                  <span style="font-weight:500;font-size:15px">{{ a.title }}</span>
+                  <dc-import name="Status Pill" status="{{ a.sev }}" size="sm" hint-size="80px,22px"></dc-import>
+                  <span></span><span style="grid-column:span 2;color:var(--color-text-muted);line-height:1.55">{{ a.impact }}</span>
+                  <span></span><span style="grid-column:span 2;line-height:1.55"><span style="color:var(--color-text-subtle)">Do:</span> {{ a.action }}</span>
+                </div>
+              </sc-for>
+            </section>
+            <section style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface);overflow:hidden">
+              <div style="display:flex;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--color-border)"><h2 style="margin:0;font-size:17px;font-weight:500">Containers</h2><span style="color:var(--color-text-muted);font-size:13px">14 / 14 up · 1 restart · 0 OOM · 0 on "latest" · 11 without memory limit</span></div>
+              <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.4fr) 90px 60px 110px minmax(0,1fr);gap:12px;padding:10px 20px;font-size:12px;color:var(--color-text-subtle)"><span>Name</span><span>Image</span><span>State</span><span>CPU</span><span>Memory / limit</span><span>Published ports</span></div>
+              <sc-for list="{{ containers }}" as="c" hint-placeholder-count="14">
+                <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.4fr) 90px 60px 110px minmax(0,1fr);gap:12px;padding:10px 20px;border-top:1px solid var(--color-border);align-items:center;font-size:13px">
+                  <span dir="ltr" style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+                  <span dir="ltr" style="font-family:var(--font-mono);font-size:12px;color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.image }}</span>
+                  <dc-import name="Status Pill" status="healthy" label="Up" variant="plain" size="sm" hint-size="40px,16px"></dc-import>
+                  <span dir="ltr" style="font-family:var(--font-mono);font-size:12px">{{ c.cpu }}</span>
+                  <span dir="ltr" style="font-family:var(--font-mono);font-size:12px;color:{{ c.memC }}">{{ c.mem }}</span>
+                  <span dir="ltr" style="font-family:var(--font-mono);font-size:12px;color:{{ c.portC }}">{{ c.ports }}</span>
+                </div>
+              </sc-for>
+            </section>
+            <section style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface);overflow:hidden">
+              <div style="display:flex;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--color-border)"><h2 style="margin:0;font-size:17px;font-weight:500">n8n</h2><span style="color:var(--color-text-muted);font-size:13px">1 instance</span></div>
+              <div style="display:grid;grid-template-columns:minmax(0,1.4fr) 70px 90px minmax(0,1.2fr) 100px minmax(0,1fr) 70px;gap:12px;padding:10px 20px;font-size:12px;color:var(--color-text-subtle)"><span>Instance</span><span>Version</span><span>Workflows</span><span>Executions 24h</span><span>Database</span><span>Telegram</span><span>Missed</span></div>
+              <div style="display:grid;grid-template-columns:minmax(0,1.4fr) 70px 90px minmax(0,1.2fr) 100px minmax(0,1fr) 70px;gap:12px;padding:12px 20px;border-top:1px solid var(--color-border);align-items:center;font-size:13px" dir="ltr">
+                <span style="font-weight:500">n8n-lens-1</span><span style="font-family:var(--font-mono);font-size:12px">2.28.3</span><span>7 / 22</span><span>318 ok · 0 failed</span><span>SQLite 4.3 MB</span><span>2 bots · webhook OK</span><span>0</span>
+              </div>
+              <div style="padding:12px 20px;border-top:1px solid var(--color-border);display:flex;gap:10px;align-items:center;font-size:13px;color:var(--color-text-muted)"><dc-import name="Status Pill" status="warning" size="sm" hint-size="80px,22px"></dc-import>4 HTTP Request nodes in 2 workflows call dead host <span dir="ltr" style="font-family:var(--font-mono);font-size:12px;color:var(--color-text)">203.0.113.99</span></div>
+            </section>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px">
+              <section style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface)">
+                <div style="padding:18px 20px;border-bottom:1px solid var(--color-border)"><h2 style="margin:0;font-size:17px;font-weight:500">Scripts and services</h2></div>
+                <sc-for list="{{ services }}" as="s" hint-placeholder-count="3">
+                  <div style="padding:14px 20px;border-top:{{ s.bd }};display:flex;flex-direction:column;gap:4px">
+                    <div style="display:flex;justify-content:space-between;gap:8px"><span dir="ltr" style="font-weight:500">{{ s.name }}</span><dc-import name="Status Pill" status="{{ s.sev }}" variant="plain" size="sm" hint-size="70px,16px"></dc-import></div>
+                    <span style="font-size:12px;color:var(--color-text-subtle)">{{ s.kind }}</span><span style="font-size:13px;color:var(--color-text-muted)">{{ s.detail }}</span>
+                  </div>
+                </sc-for>
+                <div style="padding:14px 20px;border-top:1px solid var(--color-border);display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--color-text-muted)">systemd units</span><span>24 running · 0 failed</span></div>
+              </section>
+              <div style="display:flex;flex-direction:column;gap:24px">
+                <section style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface)">
+                  <div style="padding:18px 20px;border-bottom:1px solid var(--color-border);display:flex;justify-content:space-between"><h2 style="margin:0;font-size:17px;font-weight:500">Databases</h2><dc-import name="Status Pill" status="warning" variant="plain" size="sm" label="Public port" hint-size="90px,16px"></dc-import></div>
+                  <div style="padding:14px 20px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">
+                    <div style="grid-column:span 2;display:flex;gap:8px;align-items:baseline"><span style="font-weight:500;font-size:14px">Supabase</span><span dir="ltr" style="font-family:var(--font-mono);font-size:12px;color:var(--color-text-subtle)">postgres 17.6.1.136</span></div>
+                    <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:var(--color-text-subtle)">Size · 24h</span><span dir="ltr">412 MB · +6.1 MB</span></div>
+                    <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:var(--color-text-subtle)">Connections</span><span dir="ltr">18 / 100</span></div>
+                    <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:var(--color-text-subtle)">Last backup</span><span>7h ago · 38 MB</span></div>
+                    <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:var(--color-text-subtle)">Status</span><span>Up 41d</span></div>
+                  </div>
+                </section>
+                <section style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface)">
+                  <div style="padding:18px 20px;border-bottom:1px solid var(--color-border)"><h2 style="margin:0;font-size:17px;font-weight:500">Domains and TLS</h2></div>
+                  <sc-for list="{{ domains }}" as="d" hint-placeholder-count="2">
+                    <div style="padding:12px 20px;border-top:{{ d.bd }};display:flex;justify-content:space-between;gap:12px;font-size:13px">
+                      <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span dir="ltr" style="font-weight:500;overflow:hidden;text-overflow:ellipsis">{{ d.domain }}</span><span style="font-size:12px;color:var(--color-text-subtle)">Resolves to expected IP · HTTPS OK</span></div>
+                      <span style="white-space:nowrap;color:var(--color-text-muted)" dir="ltr">{{ d.days }} days</span>
+                    </div>
+                  </sc-for>
+                </section>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:24px">
+            <section style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface)">
+              <div style="padding:18px 20px;border-bottom:1px solid var(--color-border)"><h2 style="margin:0;font-size:17px;font-weight:500">Security</h2></div>
+              <sc-for list="{{ security }}" as="s" hint-placeholder-count="5">
+                <div style="padding:12px 20px;border-top:{{ s.bd }};display:flex;justify-content:space-between;gap:12px;font-size:13px"><span style="color:var(--color-text-muted)">{{ s.k }}</span><span style="color:{{ s.c }};font-weight:{{ s.w }};text-align:end">{{ s.v }}</span></div>
+              </sc-for>
+            </section>
+            <section style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface)">
+              <div style="padding:18px 20px;border-bottom:1px solid var(--color-border);display:flex;justify-content:space-between"><h2 style="margin:0;font-size:17px;font-weight:500">Exposed ports</h2><span style="font-size:13px;color:var(--color-text-muted)">8 public</span></div>
+              <sc-for list="{{ ports }}" as="p" hint-placeholder-count="8">
+                <div style="padding:10px 20px;border-top:{{ p.bd }};display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:10px;align-items:center;font-size:13px">
+                  <span dir="ltr" style="font-family:var(--font-mono);color:{{ p.c }}">{{ p.port }}</span><span dir="ltr" style="color:var(--color-text-muted)">{{ p.svc }}</span>
+                  <span style="font-size:12px;font-weight:600;color:{{ p.c }}">{{ p.flag }}</span>
+                </div>
+              </sc-for>
+            </section>
+            <section style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface)">
+              <div style="padding:18px 20px;border-bottom:1px solid var(--color-border)"><h2 style="margin:0;font-size:17px;font-weight:500">Changes timeline</h2></div>
+              <div style="padding:16px 20px;display:flex;flex-direction:column">
+                <sc-for list="{{ timeline }}" as="t" hint-placeholder-count="6">
+                  <div style="display:grid;grid-template-columns:14px minmax(0,1fr);gap:12px">
+                    <div style="display:flex;flex-direction:column;align-items:center"><span style="width:9px;height:9px;border-radius:50%;border:2px solid {{ t.dot }};box-sizing:border-box;margin-top:5px;flex:none"></span><span style="flex:1;width:1px;background:var(--color-border)"></span></div>
+                    <div style="display:flex;flex-direction:column;gap:2px;padding-bottom:16px"><span style="font-size:12px;color:var(--color-text-subtle)">{{ t.when }} · {{ t.kind }}</span><span style="font-size:13px;line-height:1.5">{{ t.text }}</span></div>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+            <section style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface)">
+              <div style="padding:18px 20px;border-bottom:1px solid var(--color-border)"><h2 style="margin:0;font-size:17px;font-weight:500">Backups</h2></div>
+              <div style="padding:12px 20px;display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--color-text-muted)">Supabase dump</span><span>02:00 · 7h ago · 38 MB</span></div>
+              <div style="padding:12px 20px;border-top:1px solid var(--color-border);display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--color-text-muted)">n8n SQLite</span><span>02:05 · 7h ago · 4.3 MB</span></div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ pg.alerts }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:32px;line-height:1.15;font-weight:420;letter-spacing:-0.025em">Alerts</h1><span style="color:var(--color-text-muted)">Duplicates are grouped by check. Acknowledging silences repeats for that check until it changes.</span></div>
+        <div style="display:flex;gap:4px;border-bottom:1px solid var(--color-border)">
+          <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+            <button type="button" onClick="{{ t.go }}" style="height:40px;padding:0 14px;border:0;border-bottom:2px solid {{ t.bd }};margin-bottom:-1px;background:transparent;color:{{ t.fg }};font:inherit;font-weight:500;cursor:pointer;display:flex;gap:8px;align-items:center">{{ t.label }} <span style="color:var(--color-text-subtle);font-weight:400">{{ t.n }}</span></button>
+          </sc-for>
+        </div>
+        <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 12px 10px 20px;border-radius:999px;background:var(--color-surface-raised);border:1px solid var(--color-border-strong)">
+            <span style="font-weight:500">{{ selCount }} selected</span><span style="flex:1"></span>
+            <x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Button" size="sm" icon-start="check" on-click="{{ ackSel }}" hint-size="130px,36px">Acknowledge</x-import>
+            <x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Button" size="sm" variant="secondary" icon-start="clock" hint-size="100px,36px">Mute 1h</x-import>
+            <x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Button" size="sm" variant="ghost" on-click="{{ clearSel }}" hint-size="70px,36px">Clear</x-import>
+          </div>
+        </sc-if>
+        <div style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface);overflow:hidden">
+          <div style="display:grid;grid-template-columns:{{ acols }};gap:16px;padding:12px 20px;font-size:12px;color:var(--color-text-subtle);align-items:center">
+            <input type="checkbox" aria-label="Select all" checked="{{ allSel }}" onChange="{{ toggleAll }}" style="width:16px;height:16px;margin:0;accent-color:var(--color-primary)">
+            <span>Severity</span><span>Check</span><span>Server</span><span>First seen</span><span>Occurrences</span><span>State</span>
+          </div>
+          <sc-for list="{{ alerts }}" as="a" hint-placeholder-count="8">
+            <div style="display:grid;grid-template-columns:{{ acols }};gap:16px;padding:14px 20px;border-top:1px solid var(--color-border);align-items:center;background:{{ a.bg }}">
+              <input type="checkbox" aria-label="Select alert" checked="{{ a.sel }}" onChange="{{ a.toggle }}" style="width:16px;height:16px;margin:0;accent-color:var(--color-primary)">
+              <dc-import name="Status Pill" status="{{ a.sev }}" size="sm" hint-size="80px,22px"></dc-import>
+              <div style="display:flex;flex-direction:column;gap:3px;min-width:0"><span style="font-weight:500">{{ a.check }}</span><span style="font-size:12px;color:var(--color-text-subtle)">{{ a.detail }}</span></div>
+              <div style="display:flex;flex-direction:column;gap:3px;min-width:0"><span dir="ltr" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.server }}</span>
+                <sc-if value="{{ a.group }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ a.expand }}" style="align-self:flex-start;border:0;background:none;padding:0;font:inherit;font-size:12px;color:var(--color-primary);cursor:pointer;white-space:nowrap">{{ a.groupLabel }}</button></sc-if>
+              </div>
+              <span style="color:var(--color-text-muted)">{{ a.first }}</span>
+              <span dir="ltr" style="font-family:var(--font-mono);font-size:13px">{{ a.occ }}</span>
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:{{ a.stC }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ a.stC }}"></span>{{ a.state }}</span>
+            </div>
+            <sc-if value="{{ a.open }}" hint-placeholder-val="{{ false }}">
+              <sc-for list="{{ a.children }}" as="c" hint-placeholder-count="4">
+                <div style="display:grid;grid-template-columns:{{ acols }};gap:16px;padding:10px 20px;border-top:1px dashed var(--color-border);align-items:center;background:var(--color-surface-sunken);font-size:13px">
+                  <span></span><span></span><span style="color:var(--color-text-muted)">{{ c.what }}</span><span dir="ltr">{{ c.server }}</span><span style="color:var(--color-text-muted)">{{ c.first }}</span><span dir="ltr" style="font-family:var(--font-mono);font-size:12px">{{ c.occ }}</span><span style="color:var(--color-text-muted)">Open</span>
+                </div>
+              </sc-for>
+            </sc-if>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ pg.add }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:24px;max-width:1040px">
+        <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:32px;line-height:1.15;font-weight:420;letter-spacing:-0.025em">Add server</h1><span style="color:var(--color-text-muted)">The agent is read-only. It reports and never changes anything on the server.</span></div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:24px;align-items:start">
+          <section style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface);padding:24px;display:flex;flex-direction:column;gap:18px">
+            <span style="font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em;color:var(--color-text-subtle)">1 · DETAILS</span>
+            <x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Field" label="Server name" default-value="souq-sahel-api" helper="Lowercase, as it should appear in reports." hint-size="100%,96px"></x-import>
+            <x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Field" label="Client" type="select" options="{{ clientOpts }}" hint-size="100%,72px"></x-import>
+            <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;font-weight:500">Environment</span>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;border:1px solid var(--color-border-strong);border-radius:999px">
+                <sc-for list="{{ envs }}" as="e" hint-placeholder-count="3"><button type="button" onClick="{{ e.pick }}" aria-pressed="{{ e.on }}" style="height:34px;border:0;border-radius:999px;background:{{ e.bg }};color:{{ e.fg }};font:inherit;font-weight:500;cursor:pointer">{{ e.label }}</button></sc-for>
+              </div>
+            </div>
+          </section>
+          <section style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface);padding:24px;display:flex;flex-direction:column;gap:18px">
+            <span style="font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em;color:var(--color-text-subtle)">2 · INSTALL THE AGENT</span>
+            <p style="margin:0;color:var(--color-text-muted);line-height:1.6">Run this once on the server as a sudo user. The token works once and expires in 30 minutes.</p>
+            <div dir="ltr" style="display:flex;align-items:center;gap:12px;padding:6px 6px 6px 16px;border-radius:var(--radius-input);background:var(--color-surface-sunken);border:1px solid var(--color-border)">
+              <code style="flex:1;min-width:0;font-family:var(--font-mono);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">curl -fsSL https://get.pixtaha.com/agent | sudo sh -s -- --token {{ token }}</code>
+              <button type="button" onClick="{{ toggleTok }}" style="height:32px;padding:0 10px;border:0;border-radius:999px;background:transparent;color:var(--color-text-muted);font:inherit;font-size:13px;cursor:pointer">{{ tokLabel }}</button>
+              <x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Button" size="sm" variant="secondary" icon-start="{{ copyIcon }}" on-click="{{ copy }}" hint-size="90px,36px">{{ copyLabel }}</x-import>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;font-size:13px;color:var(--color-text-subtle);white-space:nowrap"><span>Token expires in <strong dir="ltr" style="font-weight:500;color:var(--color-text)">29:12</strong></span><span>Ubuntu 20.04+ · Debian 11+ · Docker optional</span></div>
+            <div style="border-top:1px solid var(--color-border);padding-top:18px">
+              <sc-if value="{{ add.waiting }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;gap:14px;align-items:center;padding:16px;border-radius:var(--radius-input);border:1px dashed var(--color-border-strong)">
+                  <span style="color:var(--color-primary);display:flex"><x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Icon" name="loader" size="20" hint-size="20px,20px"></x-import></span>
+                  <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:500">Waiting for first heartbeat…</span><span style="font-size:13px;color:var(--color-text-muted)">This page updates on its own when the agent connects.</span></div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ add.success }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:16px;padding:18px;border-radius:var(--radius-input);background:var(--color-healthy-soft)">
+                  <div style="display:flex;gap:12px;align-items:center"><dc-import name="Status Pill" status="healthy" label="Connected" hint-size="110px,28px"></dc-import><span style="font-size:13px;color:var(--color-text-muted);white-space:nowrap">First heartbeat <span dir="ltr">09:14:22</span></span></div>
+                  <span style="line-height:1.6"><span dir="ltr" style="font-weight:500">souq-sahel-api</span> is reporting. Found 6 containers, 1 Supabase, 2 domains. First daily report: tomorrow 09:00.</span>
+                  <div style="display:flex;gap:8px"><x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Button" icon-end="arrowRight" on-click="{{ goFleet }}" hint-size="140px,44px">Open server</x-import><x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Button" variant="ghost" hint-size="140px,44px">Add another</x-import></div>
+                </div>
+              </sc-if>
+            </div>
+          </section>
+        </div>
+      </div>
+    </sc-if>
+  </main>
+</div>
+</sc-if>
+
+<sc-if value="{{ mobile }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column">
+    <div style="position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--color-appbar);backdrop-filter:var(--blur-appbar);border-bottom:1px solid var(--color-border)">
+      <div dir="ltr" style="display:flex;align-items:baseline;gap:6px;white-space:nowrap"><x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Wordmark" size="17" hint-size="66px,20px"></x-import><span style="font-size:14px;color:var(--color-text-muted)">Management</span></div>
+      <button type="button" aria-label="Menu" style="width:44px;height:44px;border:0;border-radius:999px;background:transparent;color:var(--color-text);display:grid;place-items:center"><x-import component-from-global-scope="PixtahaDesignSystem_9866b6.Icon" name="menu" size="20" hint-size="20px,20px"></x-import></button>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:4px"><h1 style="margin:0;font-size:28px;font-weight:420;letter-spacing:-0.02em">Fleet</h1><span style="font-size:13px;color:var(--color-text-muted)">Wed 4 Nov · 09:14 Cairo</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface);overflow:hidden">
+        <sc-for list="{{ summaryM }}" as="s" hint-placeholder-count="4">
+          <div style="padding:14px 16px;display:flex;flex-direction:column;gap:4px;border-top:{{ s.bt }};border-inline-start:{{ s.bs }}"><span style="font-size:12px;color:var(--color-text-muted)">{{ s.label }}</span><span dir="ltr" style="font-size:22px;line-height:1;color:{{ s.c }}">{{ s.v }}</span></div>
+        </sc-for>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;height:44px;padding-inline:14px;border:1px solid var(--color-border-strong);border-radius:999px;background:var(--color-surface);color:var(--color-text-subtle)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <input value="{{ q }}" onChange="{{ onQ }}" placeholder="Search servers" style="flex:1;min-width:0;border:0;outline:0;background:transparent;font:inherit;font-size:15px;color:var(--color-text)">
+      </label>
+      <div style="display:flex;gap:8px;overflow-x:auto;margin-inline:-20px;padding-inline:20px;padding-bottom:4px;scrollbar-width:none">
+        <sc-for list="{{ chips }}" as="c" hint-placeholder-count="4">
+          <button type="button" onClick="{{ c.toggle }}" style="flex:none;display:flex;align-items:center;gap:6px;height:44px;padding-inline:14px;border:1px solid {{ c.bd }};border-radius:999px;background:{{ c.bg }};color:var(--color-text);font:inherit;font-size:14px">{{ c.label }} <span style="color:var(--color-text-subtle)">{{ c.n }}</span></button>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+          <div onClick="{{ r.open }}" style="border:1px solid var(--color-border);border-radius:var(--radius-card);background:var(--color-surface);padding:16px;display:flex;flex-direction:column;gap:12px;opacity:{{ r.op }}">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+              <div style="display:flex;flex-direction:column;gap:3px;min-width:0"><span dir="ltr" style="font-weight:500;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.name }}</span><span style="display:flex;gap:6px;align-items:center;font-size:13px;color:var(--color-text-muted);min-width:0"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.client }}</span><span style="flex:none;padding:0 7px;border:1px solid var(--color-border-strong);border-radius:999px;font-size:11px;line-height:18px">{{ r.env }}</span></span></div>
+              <dc-import name="Status Pill" status="{{ r.status }}" size="sm" hint-size="80px,22px"></dc-import>
+            </div>
+            <sc-if value="{{ r.note }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:{{ r.noteC }}">{{ r.note }}</span></sc-if>
+            <div dir="ltr" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+              <sc-for list="{{ r.bars }}" as="b" hint-placeholder-count="3">
+                <div style="display:flex;flex-direction:column;gap:5px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--color-text-subtle)"><span>{{ b.k }}</span><span style="font-family:var(--font-mono);color:{{ b.tc }}">{{ b.v }}</span></div><div style="height:5px;border-radius:3px;background:var(--color-surface-sunken);overflow:hidden"><div style="height:100%;width:{{ b.w }};background:{{ b.c }}"></div></div></div>
+              </sc-for>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+              <div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ r.chips }}" as="c" hint-placeholder-count="2"><span style="padding:3px 9px;border-radius:999px;background:var(--color-surface-sunken);font-size:12px;color:var(--color-text-muted)">{{ c }}</span></sc-for></div>
+              <span style="font-size:12px;color:{{ r.hbC }};white-space:nowrap">{{ r.hb }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1000},&quot;page&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;fleet&quot;,&quot;detail&quot;,&quot;alerts&quot;,&quot;add&quot;],&quot;default&quot;:&quot;fleet&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;mobile&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;populated&quot;,&quot;loading&quot;,&quot;empty&quot;],&quot;default&quot;:&quot;populated&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;addStep&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;waiting&quot;,&quot;success&quot;],&quot;default&quot;:&quot;waiting&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const SERVERS = [
+  ['core-01','Pixtaha','production','critical',21,68,28,['5 n8n','Supabase','Python ×2','siglip2'],1,4,'14s ago','Public database ports'],
+  ['nilehub-api','Nile Hub Logistics','production','critical',78,96,52,['Flask API ×3','Postgres','Redis'],1,1,'9s ago','3 OOM kills in 24h'],
+  ['lens-studio','Lens Studio','production','warning',9,44,23,['1 n8n','Supabase','rembg','Flask API'],0,4,'11s ago','Firewall inactive'],
+  ['souq-sahel-web','Souq Sahel','production','warning',31,58,87,['Next.js','Supabase'],0,1,'6s ago','Disk 87% · 11 days until full'],
+  ['dentaplus-crm','DentaPlus Clinics','production','offline',null,null,null,['2 n8n','Postgres'],0,0,'7m ago','Last seen 7m ago'],
+  ['flows-platform','Flows Academy','production','healthy',34,60,46,['33 n8n','Next.js','Postgres'],0,0,'8s ago',''],
+  ['facility-ops','Delta Facility Co','production','healthy',6,33,31,['1 n8n','Postgres'],0,0,'13s ago',''],
+  ['redsea-tours','Red Sea Tours','production','healthy',12,41,38,['3 n8n','Next.js'],0,0,'5s ago',''],
+  ['greenleaf-ml','Greenleaf Agritech','production','healthy',44,71,52,['Python ×4','Model service'],0,0,'10s ago',''],
+  ['delta-legal-demo','Delta Legal','demo','healthy',4,22,18,['3 n8n'],0,0,'12s ago',''],
+  ['cairo-print-shop','Cairo Print Co','demo','healthy',3,19,14,['Flask API','SQLite'],0,0,'7s ago',''],
+  ['mansoura-dev','Pixtaha','dev','healthy',15,37,41,['Python ×4','Supabase'],0,0,'4s ago','']
+];
+const ALERTS = [
+  { id:1, sev:'critical', check:'Database port public', detail:'supabase-pooler 5432, 6543 on 0.0.0.0', server:'core-01', first:'2 Nov 14:02', occ:'412', state:'Open' },
+  { id:2, sev:'critical', check:'Container OOM killed', detail:'worker-2 hit 1 GB limit', server:'nilehub-api', first:'Today 06:12', occ:'3', state:'Open' },
+  { id:3, sev:'warning', check:'Unpinned "latest" image', detail:'Image can change on restart', server:'3 servers', first:'28 Oct 09:00', occ:'96', state:'Open', children:[
+    { what:'n8n-client-b, n8n-demo, n8n-client-c, n8n-client-d, rembg', server:'core-01', first:'28 Oct', occ:'80' },
+    { what:'web, worker', server:'souq-sahel-web', first:'30 Oct', occ:'12' },
+    { what:'api', server:'cairo-print-shop', first:'3 Nov', occ:'4' }] },
+  { id:4, sev:'warning', check:'Disk filling up', detail:'87% used · 11 days until full', server:'souq-sahel-web', first:'1 Nov 22:40', occ:'8', state:'Open' },
+  { id:5, sev:'warning', check:'Dead host in n8n nodes', detail:'203.0.113.99 not responding', server:'lens-studio', first:'29 Oct 10:15', occ:'6', state:'Open' },
+  { id:6, sev:'warning', check:'TLS certificate expiring', detail:'wa.core-01.example · 12 days left', server:'core-01', first:'3 Nov 09:00', occ:'2', state:'Open' },
+  { id:7, sev:'offline', check:'Agent heartbeat missing', detail:'No report for 7 minutes', server:'dentaplus-crm', first:'Today 09:07', occ:'1', state:'Open' },
+  { id:8, sev:'warning', check:'Firewall inactive', detail:'ufw disabled', server:'lens-studio', first:'21 Oct 09:00', occ:'15', state:'Acknowledged' }
+];
+class Component extends DCLogic {
+  state = { page: null, theme: null, q: '', statuses: [], sel: {}, tab: 'Open', open: { 3: true }, env: 'production', showTok: false, copied: false, acked: {} };
+  componentDidMount() { const t = setInterval(() => { if (window.PxReportEmail) { clearInterval(t); this.forceUpdate(); } }, 60); }
+  renderVals() {
+    const page = this.state.page ?? this.props.page ?? 'fleet';
+    const theme = this.state.theme ?? this.props.theme ?? 'dark';
+    const mobile = (this.props.device ?? 'desktop') === 'mobile';
+    const fstate = this.props.state ?? 'populated';
+    const go = (p) => () => this.setState({ page: p });
+    const ORDER = { critical: 0, warning: 1, offline: 2, healthy: 3 };
+    const q = this.state.q.toLowerCase();
+    const barC = (v) => v >= 95 ? 'var(--color-critical)' : v >= 85 ? 'var(--color-warning)' : 'var(--color-text-subtle)';
+    const barT = (v) => v >= 95 ? 'var(--color-critical)' : v >= 85 ? 'var(--color-warning)' : 'var(--color-text-muted)';
+    const rows = SERVERS.filter(s => (!q || (s[0] + ' ' + s[1]).toLowerCase().includes(q)) && (!this.state.statuses.length || this.state.statuses.includes(s[3])))
+      .sort((a, b) => ORDER[a[3]] - ORDER[b[3]])
+      .map(s => {
+        const off = s[3] === 'offline';
+        return { name: s[0], client: s[1], env: s[2], status: s[3], chips: s[7], hb: s[10], note: s[11], op: off ? 0.72 : 1,
+          noteC: s[3] === 'critical' ? 'var(--color-critical)' : s[3] === 'warning' ? 'var(--color-warning)' : 'var(--color-text-muted)',
+          hbC: off ? 'var(--color-offline)' : 'var(--color-text-subtle)',
+          alerts: s[8] || s[9] ? [s[8] ? s[8] + ' critical' : '', s[9] ? s[9] + ' warning' : ''].filter(Boolean).join(' · ') : (off ? '—' : 'None'),
+          ac: s[8] ? 'var(--color-critical)' : s[9] ? 'var(--color-warning)' : 'var(--color-text-subtle)', aw: s[8] || s[9] ? 600 : 400,
+          bars: [['CPU', s[4]], ['RAM', s[5]], ['Disk', s[6]]].map(([k, v]) => ({ k, v: v == null ? '—' : v + '%', w: (v ?? 0) + '%', c: barC(v ?? 0), tc: barT(v ?? 0) })),
+          open: () => this.setState({ page: 'detail' }) };
+      });
+    const cnt = (st) => SERVERS.filter(s => s[3] === st).length;
+    const chips = ['critical', 'warning', 'offline', 'healthy'].map(st => { const on = this.state.statuses.includes(st); return {
+      label: { critical: 'Critical', warning: 'Warning', offline: 'Offline', healthy: 'Healthy' }[st], n: String(cnt(st)), on,
+      bd: on ? 'var(--color-text-subtle)' : 'var(--color-border-strong)', bg: on ? 'var(--color-surface-sunken)' : 'transparent',
+      toggle: () => this.setState(s => ({ statuses: on ? s.statuses.filter(x => x !== st) : [...s.statuses, st] })) }; });
+    const summary = [
+      { label: 'Servers', v: '12', sub: '11 reporting', c: 'var(--color-text)' },
+      { label: 'Containers up', v: '203 / 206', sub: '3 down', c: 'var(--color-text)' },
+      { label: 'Critical alerts', v: '2', sub: 'open', c: 'var(--color-critical)' },
+      { label: 'Warning alerts', v: '10', sub: 'open', c: 'var(--color-warning)' },
+      { label: 'Offline agents', v: '1', sub: 'dentaplus-crm', c: 'var(--color-offline)' }].map((s, i) => ({ ...s, bd: i ? '1px solid var(--color-border)' : '0' }));
+    const summaryM = [summary[0], summary[2], summary[3], summary[4]].map((s, i) => ({ ...s, bt: i > 1 ? '1px solid var(--color-border)' : '0', bs: i % 2 ? '1px solid var(--color-border)' : '0' }));
+    const nav = [['fleet', 'Fleet', 'table'], ['alerts', 'Alerts', 'alert', 12], ['add', 'Add server', 'plus'], ['reports', 'Daily reports', 'mail']].map(([id, label, icon, count]) => {
+      const cur = page === id || (id === 'fleet' && page === 'detail');
+      return { label, icon, count: count || false, cur: cur ? 'page' : undefined, go: id === 'reports' ? () => {} : go(id), bg: cur ? 'var(--color-surface-sunken)' : 'transparent', fg: cur ? 'var(--color-text)' : 'var(--color-text-muted)' }; });
+
+    // detail
+    const E = window.PxReportEmail, A = E ? E.samples.A : null;
+    const series = (gen) => { const pts = Array.from({ length: 96 }, (_, i) => gen(i)); const line = pts.map((v, i) => (i ? 'L' : 'M') + (i * 300 / 95).toFixed(1) + ' ' + (100 - v).toFixed(1)).join(' '); return { line, area: line + ' L300 100 L0 100 Z' }; };
+    const charts = [
+      { title: 'CPU', meta: 'avg 9% · peak 58%', ...series(i => 8 + Math.sin(i / 5) * 3 + (i === 72 ? 50 : i === 73 ? 20 : 0) + (i % 7) * 0.6) },
+      { title: 'Memory', meta: '3.4 / 7.8 GB', ...series(i => 42 + Math.sin(i / 14) * 3 + (i > 40 && i < 46 ? 4 : 0)) },
+      { title: 'Disk', meta: '23% · +0.2 GB / day', ...series(i => 22.6 + i * 0.006) }];
+    const kpis = [{ label: 'Uptime', v: '41d 6h', sub: 'Since 24 Sep · no reboots' }, { label: 'CPU 24h', v: '9% avg', sub: 'Peak 58% at 03:10' }, { label: 'RAM', v: '3.4 / 7.8 GB', sub: '44% used' }, { label: 'Disk', v: '23%', sub: '17.9 / 77.4 GB · full in 365+ days' }];
+    const strip = (h) => String(h).replace(/<[^>]+>/g, '');
+    const att = (A ? A.attention : []).map((a, i) => ({ ...a, title: strip(a.title), n: '0' + (i + 1), bd: i ? '1px solid var(--color-border)' : '0' }));
+    const cn = [['n8n-lens-1','n8nio/n8n:2.28.3','2.1%','612 MB / —','0.0.0.0:32768'],['rembg','danielgatis/rembg:2.0.76','0.4%','880 MB / 2 GB','0.0.0.0:7000'],['supabase-pooler','supabase/supavisor:2.5.1','0.3%','140 MB / —','0.0.0.0:5432, 6543'],['supabase-db','supabase/postgres:17.6.1.136','1.8%','520 MB / —','—'],['supabase-kong','kong:2.8.1','0.2%','160 MB / —','127.0.0.1:8000'],['supabase-auth','supabase/gotrue:v2.177.0','0.1%','22 MB / —','—'],['supabase-rest','postgrest/postgrest:v12.2.12','0.1%','18 MB / —','—'],['supabase-realtime','supabase/realtime:v2.34.47','0.3%','170 MB / —','—'],['supabase-storage','supabase/storage-api:v1.25.7','0.1%','96 MB / —','—'],['supabase-imgproxy','darthsim/imgproxy:v3.8.0','0.0%','34 MB / —','—'],['supabase-meta','supabase/postgres-meta:v0.91.0','0.1%','74 MB / —','—'],['supabase-studio','supabase/studio:2026.10.28','0.2%','190 MB / —','127.0.0.1:3000'],['supabase-analytics','supabase/logflare:1.14.2','0.6%','310 MB / 1 GB','—'],['supabase-vector','timberio/vector:0.28.1','0.2%','42 MB / 512 MB','—']]
+      .map(c => ({ name: c[0], image: c[1], cpu: c[2], mem: c[3], ports: c[4], memC: c[3].includes('/ —') ? 'var(--color-text-subtle)' : 'var(--color-text)', portC: c[4].startsWith('0.0.0.0') ? 'var(--color-warning)' : 'var(--color-text-muted)' }));
+    const services = (A ? A.services.rows : []).map((s, i) => { const [kind, ...rest] = [s.kind]; return { name: s.name, kind: s.kind, detail: s.detail, sev: s.sev, bd: i ? '1px solid var(--color-border)' : '0' }; });
+    const domains = (A ? A.domains : []).map((d, i) => ({ ...d, bd: i ? '1px solid var(--color-border)' : '0' }));
+    const security = [['SSH password login', 'Disabled'], ['Root login', 'Key only'], ['Failed logins 24h', '1,284'], ['Firewall', 'Inactive', 1], ['Unknown login IPs', 'None']].map((s, i) => ({ k: s[0], v: s[1], c: s[2] ? 'var(--color-warning)' : 'var(--color-text)', w: s[2] ? 600 : 400, bd: i ? '1px solid var(--color-border)' : '0' }));
+    const ports = [[22,'ssh'],[80,'http · proxy'],[443,'https · proxy'],[5432,'supabase-pooler','Database port',1],[6543,'supabase-pooler','Database port',1],[7000,'rembg','No proxy'],[8003,'product-image-api','Runs as root'],[32768,'n8n','No proxy']].map((p, i) => ({ port: p[0], svc: p[1], flag: p[2] || '', c: p[3] ? 'var(--color-critical)' : p[2] ? 'var(--color-warning)' : 'var(--color-text)', bd: i ? '1px solid var(--color-border)' : '0' }));
+    const timeline = [['Today 02:14','Image','supabase-studio updated from 2026.10.21 to 2026.10.28'],['Yesterday 18:40','Restart','rembg restarted once (exit 0, manual)'],['29 Oct 10:15','Alert','n8n nodes started failing on 203.0.113.99'],['24 Sep 04:02','Reboot','Server rebooted after kernel update'],['21 Sep 11:30','Port','Port 8003 opened by product-image-api']].map(t => ({ when: t[0], kind: t[1], text: t[2], dot: t[1] === 'Alert' ? 'var(--color-warning)' : 'var(--color-border-strong)' }));
+
+    // alerts
+    const tab = this.state.tab;
+    const ackd = this.state.acked;
+    const list = ALERTS.map(a => ({ ...a, state: ackd[a.id] ? 'Acknowledged' : a.state })).filter(a => tab === 'Resolved' ? false : a.state === tab);
+    const sel = this.state.sel;
+    const selIds = Object.keys(sel).filter(k => sel[k]);
+    const alerts = list.map(a => ({ ...a, sel: !!sel[a.id], bg: sel[a.id] ? 'var(--color-surface-sunken)' : 'transparent', group: !!a.children, open: !!(a.children && this.state.open[a.id]), children: a.children || [],
+      groupLabel: a.children ? (this.state.open[a.id] ? 'Hide ' : 'Show ') + a.children.length + ' grouped' : '',
+      expand: () => this.setState(s => ({ open: { ...s.open, [a.id]: !s.open[a.id] } })),
+      toggle: () => this.setState(s => ({ sel: { ...s.sel, [a.id]: !s.sel[a.id] } })),
+      stC: a.state === 'Open' ? (a.sev === 'critical' ? 'var(--color-critical)' : a.sev === 'offline' ? 'var(--color-offline)' : 'var(--color-warning)') : 'var(--color-text-subtle)' }));
+    const allOn = alerts.length > 0 && alerts.every(a => a.sel);
+    const nOpen = ALERTS.filter(a => !ackd[a.id] && a.state === 'Open').length;
+    const tabs = [['Open', nOpen], ['Acknowledged', ALERTS.length - nOpen], ['Resolved', 12]].map(([label, n]) => ({ label, n: String(n), go: () => this.setState({ tab: label, sel: {} }), bd: tab === label ? 'var(--color-primary)' : 'transparent', fg: tab === label ? 'var(--color-text)' : 'var(--color-text-muted)' }));
+
+    const addStep = this.props.addStep ?? 'waiting';
+    return {
+      theme, desktop: !mobile, mobile, pg: { [page]: true }, st: { [fstate]: true },
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' }), themeIcon: theme === 'dark' ? 'sun' : 'moon',
+      nav, goAdd: go('add'), goFleet: go('fleet'),
+      cols: 'minmax(220px,1.6fr) 230px minmax(0,1fr) minmax(0,1.3fr) 140px 76px',
+      summary, summaryM, chips, rows, skel: [1, 2, 3, 4, 5, 6],
+      q: this.state.q, onQ: (e) => this.setState({ q: e.target.value }),
+      selects: [{ k: 'Client', v: 'All' }, { k: 'Env', v: 'All' }],
+      kpis, charts, att, containers: cn, services, domains, security, ports, timeline,
+      acols: '20px 110px minmax(0,1.6fr) minmax(0,1fr) 130px 100px 130px',
+      tabs, alerts, allSel: allOn, hasSel: selIds.length > 0, selCount: selIds.length,
+      toggleAll: () => this.setState({ sel: allOn ? {} : Object.fromEntries(alerts.map(a => [a.id, true])) }),
+      clearSel: () => this.setState({ sel: {} }),
+      ackSel: () => this.setState(s => ({ acked: { ...s.acked, ...Object.fromEntries(selIds.map(k => [k, true])) }, sel: {} })),
+      clientOpts: ['Souq Sahel', 'Lens Studio', 'Flows Academy', 'Delta Facility Co', 'Pixtaha', '+ New client'],
+      envs: ['production', 'demo', 'dev'].map(e => ({ label: e, on: this.state.env === e, pick: () => this.setState({ env: e }), bg: this.state.env === e ? 'var(--color-text)' : 'transparent', fg: this.state.env === e ? 'var(--color-bg)' : 'var(--color-text-muted)' })),
+      token: this.state.showTok ? 'pmt_EXAMPLEONLY0000' : 'pmt_••••••••••••8Ze', tokLabel: this.state.showTok ? 'Hide' : 'Reveal',
+      toggleTok: () => this.setState(s => ({ showTok: !s.showTok })),
+      copyLabel: this.state.copied ? 'Copied' : 'Copy', copyIcon: this.state.copied ? 'check' : 'table',
+      copy: () => { this.setState({ copied: true }); setTimeout(() => this.setState({ copied: false }), 1600); },
+      add: { [addStep]: true }
+    };
+  }
+}
+</script>
+</body>
+</html>
