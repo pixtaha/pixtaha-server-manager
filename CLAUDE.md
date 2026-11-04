@@ -29,8 +29,8 @@ Owner: Taha (Pixtaha). Talk to him in Egyptian Arabic; everything in the repo is
 2. Server detail — done (sample data).
 3. Alerts center: open / acknowledged / resolved, grouped duplicates, bulk acknowledge.
 4. Add server: name, client, env, one-line install command, waiting-for-heartbeat state.
-5. Login: passkey first, fallback password + TOTP (Google Authenticator), backup codes, rate limiting.
-6. Data: Supabase schema `server_manager` on the self-hosted Supabase, RLS, replace `getFleet()` in `hub/src/lib/data.ts`.
+5. Login — done: passkey first, fallback password + TOTP, backup codes, rate limits (hub-owned accounts, `supabase/migrations/0004_hub_auth.sql`).
+6. Data — done: schema `server_manager` (migrations in `supabase/`), n8n stores every report, hub reads via service-role RPCs.
 
 ## Checks before every push
 - `cd hub && npx tsc --noEmit && npx next build`

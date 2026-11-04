@@ -8,7 +8,8 @@ import type { AuthError, TotpEnrollment } from "@/lib/auth/types";
 import { AuthHeading, AuthNotice, SampleTag } from "./AuthShell";
 import { CodeInput, emptyCode } from "./CodeInput";
 
-export type SetupStep = 1 | 2 | 3;
+/** 0 = choose a password (invite link only), then 1 passkey, 2 authenticator, 3 backup codes. */
+export type SetupStep = 0 | 1 | 2 | 3;
 const STEP_NAME = ["", "Passkey", "Authenticator", "Backup codes"];
 
 /** "MacBook · Safari" style label from the user agent, read after mount. */
@@ -23,7 +24,7 @@ function deviceLabel(): string {
  * First-time setup: 1 register passkey, 2 authenticator (TOTP), 3 backup codes.
  * `initialStep` lets reviewers open a step directly (/login/setup?step=2).
  */
-export function SetupFlow({ account, initialStep }: { account: string; initialStep: SetupStep }) {
+export function SetupFlow({ account, initialStep, invite }: { account: string; initialStep: SetupStep; invite?: string }) {
   const auth = useAuth();
   const router = useRouter();
   const [step, setStep] = useState<SetupStep>(initialStep);
@@ -41,6 +42,10 @@ export function SetupFlow({ account, initialStep }: { account: string; initialSt
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const pwProblem = pw.length > 0 && pw.length < 12 ? "Use at least 12 characters." : pw2.length > 0 && pw !== pw2 ? "The two passwords don't match." : null;
+
   const ids = { title: useId(), err: useId(), saved: useId() };
 
   useEffect(() => setDevice(deviceLabel()), []);
@@ -57,6 +62,20 @@ export function SetupFlow({ account, initialStep }: { account: string; initialSt
     setError(null);
     setStep(s);
   };
+
+  async function createPassword(e: FormEvent) {
+    e.preventDefault();
+    if (!invite || pw.length < 12 || pw !== pw2) return;
+    setBusy(true);
+    const r = await auth.acceptInvite(invite, pw);
+    setBusy(false);
+    if (r.ok) {
+      setPw("");
+      setPw2("");
+      return next(1);
+    }
+    setError(r.error);
+  }
 
   async function createPasskey(kind: "platform" | "cross-platform") {
     setBusy(true);
@@ -112,6 +131,37 @@ export function SetupFlow({ account, initialStep }: { account: string; initialSt
 
   return (
     <div className="auth-step">
+      {/* ---------------- 0 · password (invite link) ---------------- */}
+      {step === 0 ? (
+        <form className="auth-step" aria-labelledby={ids.title} onSubmit={createPassword} noValidate>
+          <AuthHeading id={ids.title} title="Create your password" text="This link works once. Your password is the fallback when a passkey isn't available." />
+          <dl className="setup-facts">
+            <div><dt>Account</dt><dd dir="ltr">{account}</dd></div>
+          </dl>
+          <div className="auth-fields">
+            <input type="email" autoComplete="username" value={account} readOnly hidden />
+            <div className="field">
+              <label htmlFor={`${ids.title}-pw`} className="field-label">Password</label>
+              <input id={`${ids.title}-pw`} className="field-input" type="password" dir="ltr" autoComplete="new-password" value={pw} onChange={(e) => { setPw(e.target.value); setError(null); }} minLength={12} required autoFocus aria-describedby={pwProblem || error ? ids.err : undefined} />
+            </div>
+            <div className="field">
+              <label htmlFor={`${ids.title}-pw2`} className="field-label">Repeat password</label>
+              <input id={`${ids.title}-pw2`} className="field-input" type="password" dir="ltr" autoComplete="new-password" value={pw2} onChange={(e) => { setPw2(e.target.value); setError(null); }} required />
+            </div>
+          </div>
+          {pwProblem || error ? (
+            <div id={ids.err} role="alert" className="auth-error">
+              <AlertTriangle size={16} strokeWidth={1.75} aria-hidden />
+              <span>{pwProblem ?? (error?.code === "invalid_credentials" ? "This invite link is not valid any more." : error?.code === "rate_limited" ? "Too many tries. Wait a few minutes." : (error && "message" in error && error.message) || "Something went wrong. Try again.")}</span>
+            </div>
+          ) : null}
+          <button type="submit" className="px-btn px-btn--primary px-btn--lg auth-wide" disabled={busy || pw.length < 12 || pw !== pw2} aria-busy={busy}>
+            {busy ? "Creating account…" : "Create account"}
+          </button>
+        </form>
+      ) : null}
+
+      {step > 0 ? (
       <div className="setup-progress">
         <div className="setup-progress-text">
           <span>Step <span dir="ltr">{step}</span> of 3</span>
@@ -121,6 +171,7 @@ export function SetupFlow({ account, initialStep }: { account: string; initialSt
           {[1, 2, 3].map((n) => <span key={n} className={n <= step ? "is-on" : ""} />)}
         </div>
       </div>
+      ) : null}
 
       {/* ---------------- 1 · passkey ---------------- */}
       {step === 1 ? (
@@ -140,7 +191,7 @@ export function SetupFlow({ account, initialStep }: { account: string; initialSt
               {busy ? "Waiting for passkey…" : "Create passkey"}
             </button>
             <button type="button" className="px-btn px-btn--ghost auth-wide" onClick={() => createPasskey("cross-platform")} disabled={busy}>Use a security key</button>
-            {error?.code === "passkey_unavailable" ? (
+            {error?.code === "passkey_unavailable" || error?.code === "passkey_cancelled" ? (
               <button type="button" className="px-btn px-btn--ghost auth-wide" onClick={() => next(2)}>Skip for now</button>
             ) : null}
           </div>
