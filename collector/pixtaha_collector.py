@@ -37,7 +37,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 SCHEMA = "1.0"
 
 CONFIG_FILE = os.environ.get("PIXTAHA_CONFIG", "/etc/pixtaha-collector/config.env")
@@ -1236,8 +1236,9 @@ def build_domains(containers, expected_ips):
 def build_attention(kpis, mem, disk, cont_items, cont_block, n8n_insts, dbs, domains, sec, backups, scripts, new_ports, fw_active):
     att = []
 
-    def add(check, sev, title, impact, action):
-        att.append({"id": check, "severity": sev, "title": title, "impact": impact, "action": action})
+    def add(check, sev, title, impact, action, key=None):
+        # `key` stays the same while the problem lasts (titles carry counts that change day to day)
+        att.append({"id": check, "key": key or check, "severity": sev, "title": title, "impact": impact, "action": action})
 
     def names(lst, n=5):
         lst = list(lst)
@@ -1269,7 +1270,8 @@ def build_attention(kpis, mem, disk, cont_items, cont_block, n8n_insts, dbs, dom
         add("containers.restarts", "warning", "%s restarted 3+ times in 24h" % names(many), "Repeated crashes interrupt users and lose running work.", "Read the container logs and fix the cause.")
     for x in crashed:
         if x["name"] not in many and not x["oom_kills_24h"]:
-            add("containers.restarts", "warning", "%s crashed and restarted" % x["name"], x["issue"] + ". Running executions were lost.", "Raise the memory limit or Node heap size.")
+            add("containers.restarts", "warning", "%s crashed and restarted" % x["name"], x["issue"] + ". Running executions were lost.", "Raise the memory limit or Node heap size.",
+                key="containers.restarts:" + x["name"])
     unp = [x["name"] for x in cont_items if not x["pinned"] and x["state"] == "running"]
     if unp:
         add("containers.unpinned", "warning", "%d %s unpinned images" % (len(unp), "containers use" if len(unp) > 1 else "container uses"),
@@ -1297,13 +1299,14 @@ def build_attention(kpis, mem, disk, cont_items, cont_block, n8n_insts, dbs, dom
             "%s cannot be reached by users or webhooks." % names(bad_dns), "Fix the DNS records.")
     down = [d["domain"] for d in domains if d["resolves_ok"] and not d["https_ok"]]
     if down:
-        add("domains.cert", "critical", "HTTPS fails on %s" % names(down), "Users see an error or a certificate warning.", "Check the certificate and the upstream service.")
+        add("domains.cert", "critical", "HTTPS fails on %s" % names(down), "Users see an error or a certificate warning.", "Check the certificate and the upstream service.",
+            key="domains.https")
     exp = [d for d in domains if d["cert_days_left"] is not None and (d["cert_days_left"] <= 21 or d["renewal_ok"] is False)]
     if exp:
         worst_days = min(d["cert_days_left"] for d in exp)
         add("domains.cert", "critical" if worst_days <= 7 else "warning",
             "Certificate expires in %d days: %s" % (worst_days, names([d["domain"] for d in exp])),
-            "Automatic renewal looks stuck.", "Run a certbot dry-run and check DNS.")
+            "Automatic renewal looks stuck.", "Run a certbot dry-run and check DNS.", key="domains.cert_expiry")
 
     # security
     if sec["ssh_password_auth"]:
@@ -1325,28 +1328,32 @@ def build_attention(kpis, mem, disk, cont_items, cont_block, n8n_insts, dbs, dom
     for i in n8n_insts:
         if (i["executions_failed_24h"] or 0) >= 5:
             add("n8n.failed_executions", "warning", "%s: %d failed executions" % (i["name"], i["executions_failed_24h"]),
-                "Some workflows did not finish in the last 24h.", "Open the executions list and fix the failing workflow.")
+                "Some workflows did not finish in the last 24h.", "Open the executions list and fix the failing workflow.",
+                key="n8n.failed_executions:" + i["name"])
         if (i["db_size_mb"] or 0) > 1024 or (i["db_growth_mb_24h"] or 0) > 100:
             add("n8n.db_growth", "warning", "%s SQLite database is %.1f GB" % (i["name"], (i["db_size_mb"] or 0) / 1024),
-                "Large SQLite files slow n8n down and make backups heavy.", "Prune executions and VACUUM in a quiet window.")
+                "Large SQLite files slow n8n down and make backups heavy.", "Prune executions and VACUUM in a quiet window.",
+                key="n8n.db_growth:" + i["name"])
 
     # backups
     if not backups:
-        add("backups.age", "critical", "No backups found on this server", "A disk failure or a bad change cannot be undone.", "Schedule daily backups and copy them off the server.")
+        add("backups.age", "critical", "No backups found on this server", "A disk failure or a bad change cannot be undone.", "Schedule daily backups and copy them off the server.",
+            key="backups.none")
     else:
         old = [b for b in backups if b["status"] in ("warning", "critical")]
         nodb = [d["name"] for d in dbs if d["last_backup_at"] is None and d["engine"] != "Redis"]
         stale = [d["name"] for d in dbs if d["last_backup_at"] and (now_utc() - parse_iso(d["last_backup_at"])).total_seconds() > 48 * 3600]
         if stale:
             add("backups.age", "warning", "Database backup older than 48 hours: %s" % names(stale, 3),
-                "A restore would lose the changes since the last copy.", "Check the backup schedule.")
+                "A restore would lose the changes since the last copy.", "Check the backup schedule.", key="backups.db_stale")
         if old:
             sev = "critical" if any(b["status"] == "critical" for b in old) else "warning"
             add("backups.age", sev, "Backups are out of date: %s" % names([b["name"] for b in old], 3),
-                "The newest copy is older than %s." % ("7 days" if sev == "critical" else "48 hours"), "Fix or schedule the backup job.")
+                "The newest copy is older than %s." % ("7 days" if sev == "critical" else "48 hours"), "Fix or schedule the backup job.",
+                key="backups.folders_stale")
         if nodb:
             add("backups.age", "critical", "%d %s no backup" % (len(nodb), "databases have" if len(nodb) > 1 else "database has"),
-                "%s cannot be restored after a failure." % names(nodb), "Add them to the daily backup job.")
+                "%s cannot be restored after a failure." % names(nodb), "Add them to the daily backup job.", key="backups.db_missing")
     failed_jobs = [s["name"] for s in scripts if s["last_result"] == "failed"]
     if failed_jobs:
         add("scripts.failed", "critical" if any("backup" in n for n in failed_jobs) else "warning",
