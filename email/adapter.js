@@ -137,6 +137,7 @@ var PxReportAdapter = (function () {
     if (b.containers) {
       var C = b.containers;
       var issues = (C.items || []).map(function (x) {
+        if (sev(x.status) === 'healthy') return null;
         var list = [];
         if (x.oom_kills_24h) list.push(plural(x.oom_kills_24h, 'OOM kill'));
         if (x.restarts_24h) list.push('restarted ' + x.restarts_24h + '×');
