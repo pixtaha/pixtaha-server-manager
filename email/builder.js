@@ -51,6 +51,8 @@ var PxReportEmail = (function () {
       cells.forEach(function(c){ h+='<td class="kv" valign="top" style="padding:12px 14px;font-family:'+F+'"><div style="font-size:18px;line-height:24px;color:'+(c[2]?P[c[2]]:P.text)+';'+(c[2]?'font-weight:600;':'')+'">'+ltr(c[0])+'</div><div style="font-size:12px;line-height:16px;color:'+P.muted+'">'+c[1]+'</div></td>'; });
       return h+'</tr></table>';
     }
+    function tagHtml(t){ if(!t) return ''; var n=t.kind==='new';
+      return ' <span style="display:inline-block;vertical-align:1px;margin-'+START+':6px;padding:0 7px;border-radius:999px;'+(n?'background:'+P.primary+';color:'+P.onPrimary+';':'border:1px solid '+P.strong+';color:'+P.subtle+';')+'font-family:'+F+';font-size:11px;line-height:18px;font-weight:'+(n?'600':'400')+';white-space:nowrap">'+esc(t.text)+'</span>'; }
     var sCount = function(list){ var w=list.filter(function(x){return x.sev&&x.sev!=='healthy';}).length; return w? w+' need'+(w===1?'s':'')+' attention' : mark('healthy'); };
 
     var out = [];
@@ -71,6 +73,12 @@ var PxReportEmail = (function () {
     out.push('<tr><td class="px" style="padding:0 32px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:'+P[r.status+'Soft']+';border-radius:12px"><tr>'+
       '<td width="36" valign="middle" style="padding:14px 0 14px 16px;font-family:'+F+';font-size:16px;line-height:20px;color:'+P[r.status]+'">'+st.g+'</td>'+
       '<td valign="middle" style="padding:14px 16px 14px 4px;font-family:'+F+';font-size:15px;line-height:22px;color:'+P.text+'"><strong style="color:'+P[r.status]+';font-weight:600">'+st.l+'</strong> &nbsp;'+esc(r.statusLine)+'</td></tr></table></td></tr>');
+    // what changed since the last report
+    if(r.digest){
+      var dg=r.digest;
+      out.push('<tr><td class="px" style="padding:0 32px 24px">'+statline([[String(dg.nNew),'New since last report',dg.nNew?'critical':null],[String(dg.nResolved),'Resolved',dg.nResolved?'healthy':null],[String(dg.nOpen),'Still open']])+
+        (dg.prev?'<div style="height:6px;line-height:6px;font-size:0">&nbsp;</div>'+p('Compared with the report of '+ltr(esc(dg.prev))+' Cairo time.','font-size:12px;line-height:18px;color:'+P.subtle):'')+'</td></tr>');
+    }
     // manager note
     out.push('<tr><td class="px" style="padding:0 32px 28px">'+p(esc(r.note),'font-size:16px;line-height:26px;color:'+P.text)+
       '<div style="height:10px;line-height:10px;font-size:0">&nbsp;</div>'+p('Your server manager, Pixtaha Management','font-size:13px;line-height:20px;color:'+P.subtle)+'</td></tr>');
@@ -95,11 +103,16 @@ var PxReportEmail = (function () {
       attInner='<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:'+P.sunken+';border-radius:12px"><tr><td style="padding:20px;font-family:'+F+';font-size:15px;line-height:22px;color:'+P.text+'"><span style="color:'+P.healthy+';font-weight:600">&#10003;</span>&nbsp; Nothing needs your attention today.</td></tr></table>';
     } else att.forEach(function(a,i){
       attInner+=item(
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td width="30" valign="top" style="font-family:'+M+';font-size:12px;line-height:22px;color:'+P.subtle+'">'+(i<9?'0':'')+(i+1)+'</td><td valign="top" style="font-family:'+F+';font-size:15px;line-height:22px;font-weight:500;color:'+P.text+'">'+a.title+'</td><td align="'+END+'" valign="top" width="96" style="padding-'+START+':8px">'+badge(a.sev)+'</td></tr>'+
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td width="30" valign="top" style="font-family:'+M+';font-size:12px;line-height:22px;color:'+P.subtle+'">'+(i<9?'0':'')+(i+1)+'</td><td valign="top" style="font-family:'+F+';font-size:15px;line-height:22px;font-weight:500;color:'+P.text+'">'+a.title+tagHtml(a.tag)+'</td><td align="'+END+'" valign="top" width="96" style="padding-'+START+':8px">'+badge(a.sev)+'</td></tr>'+
         '<tr><td></td><td colspan="2" style="padding-top:4px;font-family:'+F+';font-size:14px;line-height:21px;color:'+P.muted+'">'+a.impact+'</td></tr>'+
         '<tr><td></td><td colspan="2" style="padding-top:6px;font-family:'+F+';font-size:14px;line-height:21px;color:'+P.text+'"><span style="color:'+P.subtle+'">Do:</span> '+a.action+'</td></tr></table>','',i===0);
     });
     out.push(sec('Needs attention', att.length? att.length+' item'+(att.length>1?'s':'')+', most severe first':'', attInner));
+    if(r.digest&&r.digest.resolved.length){
+      out.push(sec('Resolved since last report', mark('healthy'), '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'+r.digest.resolved.map(function(x,i){
+        return '<tr><td width="26" valign="top" style="padding:10px 0;'+(i?'border-top:1px solid '+P.border+';':'')+'font-family:'+F+';font-size:14px;line-height:20px;color:'+P.healthy+';font-weight:600">&#10003;</td><td valign="top" style="padding:10px 0;'+(i?'border-top:1px solid '+P.border+';':'')+'font-family:'+F+';font-size:14px;line-height:20px;color:'+P.text+'">'+x.title+'<div style="font-size:12px;line-height:18px;color:'+P.subtle+'">Open since '+ltr(esc(x.since))+'</div></td></tr>';
+      }).join('')+'</table>'));
+    }
 
     if(r.compact){
       out.push(sec('All checks', mark('healthy'), rows(r.compact.map(function(c){return [c[0], c[1]+' &nbsp;'+mark(c[2]||'healthy')];}))));
@@ -108,8 +121,8 @@ var PxReportEmail = (function () {
       if(r.changes){
         var ch=r.changes.length? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'+r.changes.map(function(c,i){
           return '<tr><td width="88" valign="top" style="padding:10px 0;'+(i?'border-top:1px solid '+P.border+';':'')+'"><span style="display:inline-block;padding:1px 8px;border:1px solid '+P.strong+';border-radius:999px;font-family:'+M+';font-size:11px;line-height:18px;color:'+P.muted+';text-transform:uppercase;letter-spacing:0.04em">'+c.kind+'</span></td><td valign="top" style="padding:10px 0;'+(i?'border-top:1px solid '+P.border+';':'')+'font-family:'+F+';font-size:14px;line-height:21px;color:'+P.text+'">'+c.text+'</td><td align="'+END+'" valign="top" width="52" style="padding:10px 0;'+(i?'border-top:1px solid '+P.border+';':'')+'font-family:'+M+';font-size:12px;line-height:21px;color:'+P.subtle+'">'+c.time+'</td></tr>';}).join('')+'</table>'
-          : p('No changes since yesterday.','font-size:14px;line-height:21px;color:'+P.muted);
-        out.push(sec('Changes since yesterday', r.changes.length? r.changes.length+' change'+(r.changes.length>1?'s':''):'', ch));
+          : p('No changes since the last report.','font-size:14px;line-height:21px;color:'+P.muted);
+        out.push(sec('Changes since last report', r.changes.length? r.changes.length+' change'+(r.changes.length>1?'s':''):'', ch));
       }
       // containers
       if(r.containers){
@@ -117,7 +130,8 @@ var PxReportEmail = (function () {
         var ci=statline([[c.up+'/'+c.total,'Up',c.up<c.total?'warning':null],[String(c.restarts),'Restarts 24h',c.restarts?'warning':null],[String(c.oom),'OOM kills',c.oom?'critical':null],[String(c.latest),'On "latest"',c.latest?'warning':null],[String(c.nolimit),'No mem limit']]);
         if(c.issues&&c.issues.length){
           ci+='<div style="height:8px;line-height:8px;font-size:0">&nbsp;</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'+
-            c.issues.map(function(x,i){ return '<tr><td valign="top" style="padding:12px 12px 12px 0;border-top:1px solid '+P.border+';font-family:'+F+'"><div style="font-size:14px;line-height:20px;color:'+P.text+'">'+ltr(esc(x.name))+'</div><div style="font-family:'+M+';font-size:12px;line-height:18px;color:'+P.subtle+'" dir="ltr">'+esc(x.image)+'</div></td><td valign="top" width="52%" style="padding:12px 0;border-top:1px solid '+P.border+';font-family:'+F+';font-size:13px;line-height:20px;color:'+P.muted+'">'+mark(x.sev)+'<br>'+x.issue+'</td></tr>'; }).join('')+'</table>';
+            c.issues.slice(0,8).map(function(x,i){ return '<tr><td valign="top" style="padding:12px 12px 12px 0;border-top:1px solid '+P.border+';font-family:'+F+'"><div style="font-size:14px;line-height:20px;color:'+P.text+'">'+ltr(esc(x.name))+'</div><div style="font-family:'+M+';font-size:12px;line-height:18px;color:'+P.subtle+'" dir="ltr">'+esc(x.image)+'</div></td><td valign="top" width="52%" style="padding:12px 0;border-top:1px solid '+P.border+';font-family:'+F+';font-size:13px;line-height:20px;color:'+P.muted+'">'+mark(x.sev)+'<br>'+x.issue+'</td></tr>'; }).join('')+
+            (c.issues.length>8?'<tr><td colspan="2" style="padding:12px 0;border-top:1px solid '+P.border+';font-family:'+F+';font-size:14px;line-height:20px;color:'+P.muted+'">and '+(c.issues.length-8)+' more container'+(c.issues.length-8>1?'s':'')+' with the same kind of issues</td></tr>':'')+'</table>';
         }
         out.push(sec('Containers', c.issues&&c.issues.length? c.issues.length+' with issues':mark('healthy'), ci));
       }
@@ -132,7 +146,12 @@ var PxReportEmail = (function () {
           ni+='<div style="height:8px;line-height:8px;font-size:0">&nbsp;</div>';
           n.instances.forEach(function(x,i){ ni+=inst(x,false); });
           ni+='<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="padding:14px 0;border-top:1px solid '+P.border+';font-family:'+F+';font-size:14px;line-height:20px;color:'+P.muted+'">'+a.healthy+' healthy instances hidden'+(r.url?' &nbsp;&middot;&nbsp; <a href="'+r.url+'#n8n" style="color:'+P.primary+';text-decoration:none;font-weight:500">View all in dashboard</a>':'')+'</td></tr></table>';
-        } else n.instances.forEach(function(x,i){ ni+=inst(x,i===0); });
+        } else {
+          // full card for instances that need attention, one line for healthy ones
+          var nBad=n.instances.filter(function(x){return x.sev!=='healthy'||x.failed||x.tgSev||x.dbSev;}), nOk=n.instances.filter(function(x){return !(x.sev!=='healthy'||x.failed||x.tgSev||x.dbSev);});
+          nBad.forEach(function(x,i){ ni+=inst(x,i===0); });
+          if(nOk.length) ni+='<div style="'+(nBad.length?'border-top:1px solid '+P.border+';':'')+'">'+rows(nOk.map(function(x){ return [ltr(esc(x.name))+' <span style="font-family:'+M+';font-size:12px;color:'+P.subtle+'">'+esc(x.version||'')+'</span>', ltr(x.wf)+' workflows &middot; '+ltr(x.exec)+' &nbsp;'+mark('healthy')]; }))+'</div>';
+        }
         out.push(sec('n8n', n.aggregate? n.aggregate.total+' instances &middot; '+n.aggregate.healthy+' healthy &middot; '+n.aggregate.issues+' with issues' : n.instances.length+' instance'+(n.instances.length>1?'s':''), ni));
       }
       // scripts & services
@@ -144,13 +163,19 @@ var PxReportEmail = (function () {
         out.push(sec('Scripts and services', sCount(s.rows), si));
       }
       if(r.databases){
-        out.push(sec('Databases', sCount(r.databases), r.databases.map(function(d,i){ return item('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="font-family:'+F+';font-size:15px;line-height:22px;font-weight:500;color:'+P.text+'">'+esc(d.name)+' <span style="font-family:'+M+';font-size:12px;font-weight:400;color:'+P.subtle+'">'+esc(d.engine)+'</span></td><td align="'+END+'" style="font-family:'+F+';font-size:13px">'+mark(d.sev)+'</td></tr></table>',
-          kv([['Size',ltr(d.size)],['Growth 24h',ltr(d.growth)],['Connections',ltr(d.conn)],['Last backup',d.backup,d.backupSev||null]]), i===0); }).join('')));
+        // one row per database: name + engine, size and last backup, status
+        out.push(sec('Databases', sCount(r.databases), rows(r.databases.map(function(d){
+          var bk=d.backupSev?'<span style="color:'+P[d.backupSev]+';font-weight:600">backup '+esc(d.backup)+'</span>':'backup '+esc(d.backup);
+          return [esc(d.name)+'<div style="font-family:'+M+';font-size:12px;line-height:18px;color:'+P.subtle+'">'+esc(d.engine)+'</div>', ltr(d.size)+(d.growth!=='—'?' &middot; '+ltr(d.growth):'')+'<br>'+bk+' &nbsp;'+mark(d.sev)];
+        }))));
       }
       if(r.domains){
-        out.push(sec('Domains and TLS', sCount(r.domains), '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'+r.domains.map(function(d,i){
+        var dBad=r.domains.filter(function(d){return d.sev!=='healthy';}), dOk=r.domains.filter(function(d){return d.sev==='healthy';});
+        var dMin=dOk.length? Math.min.apply(null,dOk.map(function(d){return +d.days||999;})) : null;
+        var dSum=dOk.length? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="padding:12px 0;'+(dBad.length?'border-top:1px solid '+P.border+';':'')+'font-family:'+F+';font-size:14px;line-height:20px;color:'+P.muted+'">'+(dBad.length?dOk.length+' other domain'+(dOk.length>1?'s':''):'All '+dOk.length+' domain'+(dOk.length>1?'s':''))+' resolve and serve HTTPS'+(dMin<999?' &middot; nearest certificate '+ltr(dMin+' days'):'')+'</td><td align="'+END+'" style="padding:12px 0;'+(dBad.length?'border-top:1px solid '+P.border+';':'')+'">'+mark('healthy')+'</td></tr></table>' : '';
+        out.push(sec('Domains and TLS', sCount(r.domains), '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'+dBad.map(function(d,i){
           var b=(i?'border-top:1px solid '+P.border+';':'');
-          return '<tr><td valign="top" style="padding:12px 0;'+b+'font-family:'+F+'"><div style="font-size:14px;line-height:20px;color:'+P.text+'">'+ltr(esc(d.domain))+'</div><div style="font-size:12px;line-height:18px;color:'+P.subtle+'">Resolves to '+mono(d.ip,P.subtle)+' '+(d.resolves?'(expected)':'<span style="color:'+P.warning+'">(unexpected)</span>')+' &middot; HTTPS '+(d.https?'OK':'failing')+'</div></td><td align="'+END+'" valign="top" style="padding:12px 0;'+b+'font-family:'+F+';font-size:13px;line-height:20px;color:'+P.muted+';white-space:nowrap">'+mark(d.sev)+'<br>'+ltr(d.days+' days')+'</td></tr>'; }).join('')+'</table>'));
+          return '<tr><td valign="top" style="padding:12px 0;'+b+'font-family:'+F+'"><div style="font-size:14px;line-height:20px;color:'+P.text+'">'+ltr(esc(d.domain))+'</div><div style="font-size:12px;line-height:18px;color:'+P.subtle+'">Resolves to '+mono(d.ip,P.subtle)+' '+(d.resolves?'(expected)':'<span style="color:'+P.warning+'">(unexpected)</span>')+' &middot; HTTPS '+(d.https?'OK':'failing')+'</div></td><td align="'+END+'" valign="top" style="padding:12px 0;'+b+'font-family:'+F+';font-size:13px;line-height:20px;color:'+P.muted+';white-space:nowrap">'+mark(d.sev)+'<br>'+ltr(d.days+' days')+'</td></tr>'; }).join('')+'</table>'+dSum));
       }
       if(r.security){
         var sc=r.security;
