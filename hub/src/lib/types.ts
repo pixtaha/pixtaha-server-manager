@@ -266,3 +266,40 @@ export interface ServerDetail {
   hub_status: Status;
   sample?: boolean;
 }
+
+/* ------------------------------------------------------------------ */
+/* Alerts center                                                       */
+/* ------------------------------------------------------------------ */
+
+export type AlertState = "open" | "acknowledged" | "resolved";
+
+/** A check from payload v1 "Checks that produce attention[]", with the copy used when its alerts are grouped. */
+export interface AlertCheck {
+  id: string;
+  name: string;
+  /** Detail line shown on a grouped row, e.g. "Image can change on restart". */
+  summary: string;
+}
+
+/** One alert on one server. The hub groups open duplicates of the same check across servers. */
+export interface AlertItem {
+  id: string;
+  check_id: string;
+  severity: Status;
+  hostname: string;
+  /** Server-specific detail, e.g. "supabase-pooler 5432, 6543 on 0.0.0.0". */
+  detail: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  occurrences: number;
+  state: AlertState;
+  acknowledged_at?: string;
+  resolved_at?: string;
+}
+
+export interface AlertsSnapshot {
+  generatedAt: string;
+  sample: boolean;
+  checks: Record<string, AlertCheck>;
+  alerts: AlertItem[];
+}

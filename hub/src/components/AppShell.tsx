@@ -4,6 +4,7 @@ import { Bell, LayoutGrid, Mail, Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { AlertsStateProvider, useAlertsState } from "./alerts/AlertsState";
 import { ThemeToggle } from "./ThemeToggle";
 import { Wordmark } from "./Wordmark";
 
@@ -14,8 +15,17 @@ const NAV = [
   { href: "/reports", label: "Daily reports", icon: Mail, match: (p: string) => p.startsWith("/reports") },
 ];
 
-export function AppShell({ children, openAlerts }: { children: ReactNode; openAlerts: number }) {
+export function AppShell({ children, openAlertIds }: { children: ReactNode; openAlertIds: string[] }) {
+  return (
+    <AlertsStateProvider openIds={openAlertIds}>
+      <Shell>{children}</Shell>
+    </AlertsStateProvider>
+  );
+}
+
+function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "/";
+  const { openCount: openAlerts } = useAlertsState();
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -25,7 +35,7 @@ export function AppShell({ children, openAlerts }: { children: ReactNode; openAl
             <Link key={href} href={href} className="nav-item" aria-current={match(pathname) ? "page" : undefined}>
               <Icon size={18} strokeWidth={1.75} aria-hidden />
               <span className="nav-label">{label}</span>
-              {href === "/alerts" && openAlerts > 0 ? <span className="nav-count">{openAlerts}</span> : null}
+              {href === "/alerts" && openAlerts > 0 ? <span className="nav-count" aria-label={`${openAlerts} open alerts`}>{openAlerts}</span> : null}
             </Link>
           ))}
         </nav>

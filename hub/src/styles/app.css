@@ -326,3 +326,94 @@ button { font: inherit; }
   .img-name { max-width: none; white-space: normal; overflow-wrap: anywhere; }
   .img-cell { flex-wrap: wrap; }
 }
+
+/* ================================================================== */
+/* Alerts center (docs/design/dashboard-app.dc.html, pg.alerts)        */
+/* ================================================================== */
+.alerts-head { display: flex; flex-direction: column; gap: 6px; }
+
+/* ---------- tabs ---------- */
+.tabs { display: flex; gap: 4px; border-block-end: 1px solid var(--color-border); overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; height: 40px; padding: 0 14px; border: 0; border-block-end: 2px solid transparent; margin-block-end: -1px; background: transparent; color: var(--color-text-muted); font: inherit; font-weight: 500; cursor: pointer; display: flex; gap: 8px; align-items: center; border-radius: 0; }
+.tab:hover { color: var(--color-text); }
+.tab[aria-selected="true"] { color: var(--color-text); border-block-end-color: var(--color-primary); }
+.tab-n { color: var(--color-text-subtle); font-weight: 400; }
+
+/* ---------- bulk selection bar ---------- */
+.selbar { display: flex; align-items: center; gap: 12px; padding-block: 10px; padding-inline: 20px 12px; border-radius: var(--radius-pill); background: var(--color-surface-raised); border: 1px solid var(--color-border-strong); }
+.selbar-n { font-weight: 500; white-space: nowrap; }
+.selbar-sp { flex: 1; }
+
+/* ---------- list ---------- */
+.al-table { border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); overflow: hidden; }
+.al-row {
+  display: grid;
+  grid-template-columns: 20px 110px minmax(0, 1.6fr) minmax(0, 1fr) 130px 100px 130px;
+  grid-template-areas: "sel sev check server first occ state";
+  gap: 16px; padding: 14px 20px; align-items: center;
+}
+.al-table--nosel .al-row { grid-template-columns: 0 110px minmax(0, 1.6fr) minmax(0, 1fr) 130px 100px 150px; column-gap: 16px; }
+.al-table--nosel .al-sel { margin-inline-end: -16px; }
+.al-row + .al-row, .al-empty { border-block-start: 1px solid var(--color-border); }
+.al-row.is-selected { background: var(--color-surface-sunken); }
+.al-row--head { padding-block: 12px; font-size: 12px; color: var(--color-text-subtle); }
+.al-row--child { padding-block: 10px; border-block-start: 1px dashed var(--color-border) !important; background: var(--color-surface-sunken); font-size: 13px; }
+.al-sel { grid-area: sel; display: flex; align-items: center; }
+.al-sev { grid-area: sev; }
+.al-check-name { grid-area: check; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.al-server { grid-area: server; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; min-width: 0; }
+.al-first { grid-area: first; }
+.al-occ { grid-area: occ; font-size: 13px; }
+.al-state { grid-area: state; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.al-check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.al-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--color-primary); cursor: pointer; }
+.al-selall { display: none; }
+.al-name { font-weight: 500; }
+.al-detail { font-size: 12px; color: var(--color-text-subtle); overflow-wrap: anywhere; }
+.al-host { color: var(--color-text); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.al-host:hover { color: var(--color-primary); }
+.al-group { border: 0; background: none; padding: 0; font: inherit; font-size: 12px; color: var(--color-primary); cursor: pointer; white-space: nowrap; }
+.al-group:hover { text-decoration: underline; text-underline-offset: 3px; }
+.al-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.al-empty { padding: 40px 20px; display: flex; justify-content: center; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 1180px) {
+  .al-row { grid-template-columns: 20px 100px minmax(0, 1.5fr) minmax(0, 1fr) 110px 90px 120px; gap: 12px; }
+}
+@media (max-width: 900px) {
+  /* Mobile list: one card-like row per alert, following the Fleet mobile cards. */
+  .al-selall { display: inline; font-size: 14px; color: var(--color-text-muted); }
+  .al-row, .al-table--nosel .al-row {
+    grid-template-columns: 28px auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "sel sev . state"
+      "sel check check check"
+      "sel server server server"
+      "sel first first occ";
+    gap: 6px 10px; padding: 14px 16px; align-items: start;
+  }
+  .al-table--nosel .al-row { grid-template-columns: 0 auto minmax(0, 1fr) auto; column-gap: 0; }
+  .al-table--nosel .al-sel { margin-inline-end: 0; }
+  .al-table--nosel .al-check-name, .al-table--nosel .al-server, .al-table--nosel .al-first { padding-inline-start: 0; }
+  .al-check input { width: 20px; height: 20px; }
+  .al-sel { align-self: start; padding-block-start: 1px; }
+  .al-state { justify-self: end; }
+  .al-name { font-size: 15px; }
+  .al-server { flex-direction: row; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
+  .al-first, .al-occ { font-size: 12px; color: var(--color-text-subtle); }
+  .al-first::before { content: attr(data-label) " "; }
+  .al-occ { justify-self: end; font-family: var(--font-sans); }
+  .al-occ::after { content: " ×"; }
+  .al-table .al-row.al-row--head { grid-template-columns: 1fr; grid-template-areas: "sel"; padding: 12px 16px; }
+  .al-row--head > :not(.al-sel) { display: none; }
+  .al-table--nosel .al-row.al-row--head { display: none; }
+  .al-table--nosel .al-row--head + .al-row { border-block-start: 0; }
+  .al-row--child { grid-template-areas: "sel check check check" "sel server server state" "sel first first occ"; }
+  .al-row--child .al-sev { display: none; }
+  .selbar { position: fixed; inset-inline: 12px; inset-block-end: 12px; z-index: 3; padding-inline: 16px 8px; gap: 8px; box-shadow: var(--shadow-float); }
+  .selbar .px-btn--ghost { display: none; }
+  .selbar .px-btn { padding-inline: 12px; }
+  .alerts { padding-block-end: 72px; }
+}

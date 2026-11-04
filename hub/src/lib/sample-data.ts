@@ -1,4 +1,6 @@
 import type {
+  AlertItem,
+  AlertsSnapshot,
   AttentionItem,
   BackupItem,
   ChangeItem,
@@ -640,3 +642,63 @@ const SPECS: Record<string, DetailSpec> = {
 export const SAMPLE_DETAILS: Record<string, ServerDetail> = Object.fromEntries(
   SAMPLE_FLEET.servers.filter((x) => SPECS[x.hostname]).map((x) => [x.hostname, detail(x, SPECS[x.hostname])]),
 );
+
+/* ================================================================== */
+/* Alerts center sample data                                           */
+/* One alert per attention item on the detail screens above, plus the  */
+/* offline heartbeat and a few resolved ones. All fictional.           */
+/* ================================================================== */
+
+/** Cairo wall-clock time -> ISO UTC. Handles Egypt summer time (UTC+3 until late October) via Intl. */
+const cairo = (day: number, hhmm: string, month = 11) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  const guess = Date.UTC(2026, month - 1, day, h - 2, m);
+  const shown = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Cairo", hour: "2-digit", hourCycle: "h23" }).format(new Date(guess));
+  return new Date(guess - (Number(shown) - h) * 3600000).toISOString();
+};
+
+let alertSeq = 0;
+const alert = (a: Omit<AlertItem, "id" | "last_seen_at" | "state"> & Partial<Pick<AlertItem, "state" | "last_seen_at">>): AlertItem => ({
+  id: `al_${String(++alertSeq).padStart(3, "0")}`,
+  state: "open",
+  last_seen_at: ago(60),
+  ...a,
+});
+
+export const SAMPLE_ALERTS: AlertsSnapshot = {
+  generatedAt: new Date(NOW).toISOString(),
+  sample: true,
+  checks: {
+    "ports.public_database": { id: "ports.public_database", name: "Database port public", summary: "Database ports bound to 0.0.0.0" },
+    "containers.oom": { id: "containers.oom", name: "Container OOM killed", summary: "Containers killed by the kernel for memory" },
+    "containers.unpinned": { id: "containers.unpinned", name: "Unpinned \"latest\" image", summary: "Image can change on restart" },
+    "containers.no_memory_limit": { id: "containers.no_memory_limit", name: "No memory limit", summary: "App containers can take all host RAM" },
+    "containers.restarts": { id: "containers.restarts", name: "Container restarting", summary: "3 or more restarts in 24h" },
+    "host.disk": { id: "host.disk", name: "Disk filling up", summary: "Disk at 80% or full within 14 days" },
+    "host.ram": { id: "host.ram", name: "RAM pressure", summary: "RAM peak at 90% or swapping" },
+    "n8n.failed_executions": { id: "n8n.failed_executions", name: "n8n executions failing", summary: "5 or more failed executions in 24h" },
+    "security.firewall": { id: "security.firewall", name: "Firewall inactive", summary: "ufw disabled" },
+    "domains.cert": { id: "domains.cert", name: "TLS certificate expiring", summary: "21 days or less left" },
+    "backups.age": { id: "backups.age", name: "Backup too old", summary: "Last backup older than 48 hours" },
+    "agent.heartbeat": { id: "agent.heartbeat", name: "Agent heartbeat missing", summary: "No report from the collector" },
+  },
+  alerts: [
+    alert({ check_id: "ports.public_database", severity: "critical", hostname: "core-01", detail: "supabase-pooler 5432, 6543 on 0.0.0.0", first_seen_at: cairo(2, "14:02"), occurrences: 412 }),
+    alert({ check_id: "containers.oom", severity: "critical", hostname: "nilehub-api", detail: "api-worker hit its 512 MB limit", first_seen_at: cairo(4, "06:12"), occurrences: 3 }),
+    alert({ check_id: "containers.unpinned", severity: "warning", hostname: "core-01", detail: "n8n-ops, n8n-sales", first_seen_at: cairo(28, "09:00", 10), occurrences: 80 }),
+    alert({ check_id: "containers.unpinned", severity: "warning", hostname: "lens-studio", detail: "rembg", first_seen_at: cairo(3, "10:50"), occurrences: 4 }),
+    alert({ check_id: "containers.no_memory_limit", severity: "warning", hostname: "core-01", detail: "n8n-ops, n8n-sales, n8n-support", first_seen_at: cairo(21, "09:00", 10), occurrences: 58 }),
+    alert({ check_id: "containers.no_memory_limit", severity: "warning", hostname: "lens-studio", detail: "n8n", first_seen_at: cairo(30, "09:00", 10), occurrences: 22 }),
+    alert({ check_id: "host.disk", severity: "warning", hostname: "souq-sahel-web", detail: "87% used · 11 days until full", first_seen_at: cairo(1, "22:40"), occurrences: 8 }),
+    alert({ check_id: "host.ram", severity: "warning", hostname: "nilehub-api", detail: "Peak 99% with swap in use", first_seen_at: cairo(3, "18:20"), occurrences: 5 }),
+    alert({ check_id: "n8n.failed_executions", severity: "warning", hostname: "core-01", detail: "n8n-ops · 27 failed in 24h", first_seen_at: cairo(4, "05:00"), occurrences: 4 }),
+    alert({ check_id: "security.firewall", severity: "warning", hostname: "core-01", detail: "ufw disabled", first_seen_at: cairo(2, "14:02"), occurrences: 6 }),
+    alert({ check_id: "domains.cert", severity: "warning", hostname: "lens-studio", detail: "api.lens-studio.example · 18 days left", first_seen_at: cairo(3, "09:00"), occurrences: 2 }),
+    alert({ check_id: "agent.heartbeat", severity: "offline", hostname: "dentaplus-crm", detail: "No report for 7 minutes", first_seen_at: cairo(4, "09:07"), occurrences: 1, last_seen_at: ago(0) }),
+    alert({ check_id: "security.firewall", severity: "warning", hostname: "lens-studio", detail: "ufw disabled", first_seen_at: cairo(21, "09:00", 10), occurrences: 15, state: "acknowledged", acknowledged_at: cairo(22, "11:30", 10) }),
+    alert({ check_id: "domains.cert", severity: "warning", hostname: "redsea-tours", detail: "book.redsea-tours.example · renewed", first_seen_at: cairo(25, "09:00", 10), occurrences: 4, state: "resolved", resolved_at: cairo(29, "03:12", 10) }),
+    alert({ check_id: "containers.restarts", severity: "warning", hostname: "facility-ops", detail: "n8n-worker-2 · 4 restarts", first_seen_at: cairo(30, "16:40", 10), occurrences: 2, state: "resolved", resolved_at: cairo(31, "09:00", 10) }),
+    alert({ check_id: "host.disk", severity: "warning", hostname: "greenleaf-ml", detail: "82% used · old model checkpoints", first_seen_at: cairo(27, "09:00", 10), occurrences: 3, state: "resolved", resolved_at: cairo(30, "12:05", 10) }),
+    alert({ check_id: "backups.age", severity: "warning", hostname: "cairo-print-shop", detail: "Last backup 3 days old", first_seen_at: cairo(1, "09:00"), occurrences: 2, state: "resolved", resolved_at: cairo(2, "09:00") }),
+  ],
+};
