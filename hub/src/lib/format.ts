@@ -54,8 +54,8 @@ export function mb(v: number | null | undefined): string {
   return `${v < 10 ? v.toFixed(1) : Math.round(v)} MB`;
 }
 
-/** 1284 -> "1,284". */
-export const num = (v: number) => v.toLocaleString("en-US");
+/** 1284 -> "1,284", null -> "—". */
+export const num = (v: number | null | undefined) => (v == null ? "—" : v.toLocaleString("en-US"));
 
 /** "520 ms", "1.4 s". */
 export const ms = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${v} ms`);
