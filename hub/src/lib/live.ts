@@ -1,6 +1,6 @@
 import "server-only";
 import { CHECKS, checkFor } from "./checks";
-import type { AlertItem, AlertsSnapshot, Env, FleetSnapshot, ServerDetail, ServerSummary, Severity, Status } from "./types";
+import type { AlertItem, AlertsSnapshot, Env, FleetSnapshot, ReportListItem, ServerDetail, ServerSummary, Severity, Status } from "./types";
 
 /**
  * Live data from the self-hosted Supabase (schema server_manager), read server-side through the
@@ -152,10 +152,8 @@ export async function liveFleet(): Promise<FleetSnapshot> {
   return { generatedAt: new Date(now).toISOString(), sample: false, servers: rows.map((r) => summarize(r, now)) };
 }
 
-export async function liveServer(hostname: string): Promise<ServerDetail | null> {
-  const row = await rpc<ServerRow | null>("sm_server", { p_hostname: hostname });
-  if (!row || !row.payload) return null;
-  const p = row.payload;
+/** Payload v1 as stored -> the shape the Server detail view renders. */
+function toDetail(p: Payload, heartbeatAt: string, status: Status): ServerDetail {
   const attention = ((p.attention ?? []) as unknown as Record<string, unknown>[]).map((a) => ({
     id: attentionId(a),
     severity: (a.severity as Severity) ?? "warning",
@@ -163,15 +161,41 @@ export async function liveServer(hostname: string): Promise<ServerDetail | null>
     impact: String(a.impact ?? ""),
     action: String(a.action ?? ""),
   }));
-  const at = p.report.generated_at;
   return {
     ...p,
     kpis: normalizeKpis(p.kpis),
     attention,
     changes: p.changes ?? [],
     blocks: normalizeBlocks(p.blocks ?? {}),
-    server: { ...p.server, last_heartbeat_at: row.last_report_at ?? at },
-    hub_status: hubStatus(row, Date.now()),
+    server: { ...p.server, last_heartbeat_at: heartbeatAt },
+    hub_status: status,
+  };
+}
+
+export async function liveServer(hostname: string): Promise<ServerDetail | null> {
+  const row = await rpc<ServerRow | null>("sm_server", { p_hostname: hostname });
+  if (!row || !row.payload) return null;
+  return toDetail(row.payload, row.last_report_at ?? row.payload.report.generated_at, hubStatus(row, Date.now()));
+}
+
+export async function liveReports(limit = 300): Promise<ReportListItem[]> {
+  const rows = await rpc<(Omit<ReportListItem, "status"> & { status: Severity })[]>("sm_reports", { p_limit: limit });
+  return rows.map((r) => ({ ...r, status: toStatus(r.status) }));
+}
+
+/** One stored report, rendered as it was when it arrived (status from the report itself). */
+export async function liveReport(id: string): Promise<{ item: ReportListItem; detail: ServerDetail } | null> {
+  const r = await rpc<{ id: string; hostname: string; client: string; env: Env; generated_at: string; received_at: string; payload: Payload } | null>("sm_report", { p_id: id });
+  if (!r || !r.payload) return null;
+  const status = toStatus(r.payload.status?.overall);
+  const att = (r.payload.attention ?? []) as unknown as Record<string, unknown>[];
+  return {
+    item: {
+      id: r.id, hostname: r.hostname, client: r.client, env: r.env, type: r.payload.report?.type ?? "daily",
+      generated_at: r.generated_at, received_at: r.received_at, status,
+      critical: att.filter((a) => a.severity === "critical").length, warning: att.filter((a) => a.severity === "warning").length,
+    },
+    detail: toDetail(r.payload, r.generated_at, status),
   };
 }
 
