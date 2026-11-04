@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Pixtaha Management app icon: "P" + brand dot on the dark page color (tokens: --color-bg dark, --color-text dark, --color-brand). -->
+  <rect width="512" height="512" fill="#14110E"/>
+  <g id="mark">
+    <text x="232" y="368" text-anchor="middle" font-family="IBM Plex Sans, system-ui, sans-serif" font-weight="500" font-size="320" fill="#F3ECE4">P</text>
+    <circle cx="352" cy="346" r="26" fill="#C65D3B"/>
+  </g>
+</svg>

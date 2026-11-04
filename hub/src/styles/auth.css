@@ -103,3 +103,6 @@
   .qr { width: 128px; height: 128px; }
   .qr:has(.qr-svg) { width: 184px; height: 184px; }
 }
+
+/* Installed app (iOS black-translucent status bar): keep the sign-in screens clear of the notch and home indicator. */
+.auth { padding-block: env(safe-area-inset-top) env(safe-area-inset-bottom); padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); }

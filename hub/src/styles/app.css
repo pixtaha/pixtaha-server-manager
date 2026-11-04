@@ -512,3 +512,28 @@ button { font: inherit; }
   .cmd-actions { justify-content: flex-end; }
   .seg-opt span { height: 40px; }
 }
+
+/* ------------------------------------------------------------------ */
+/* Installed app (PWA): safe areas + "Install app" entry               */
+/* ------------------------------------------------------------------ */
+/* viewport-fit=cover + black-translucent status bar on iOS: keep content clear of the notch / home indicator. */
+.sidebar { padding-block-start: calc(24px + env(safe-area-inset-top)); padding-block-end: calc(16px + env(safe-area-inset-bottom)); }
+@media (max-width: 900px) {
+  .appbar { padding-block-start: calc(8px + env(safe-area-inset-top)); padding-inline: calc(20px + env(safe-area-inset-left)) calc(8px + env(safe-area-inset-right)); }
+  .main { padding-block-end: calc(48px + env(safe-area-inset-bottom)); padding-inline: calc(16px + env(safe-area-inset-left)) calc(16px + env(safe-area-inset-right)); }
+  .sheet { padding-block: calc(8px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-bottom)); }
+}
+
+.install-btn { align-self: flex-start; margin-block-start: 8px; }
+.install-root { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; justify-content: center; }
+.install-backdrop { position: absolute; inset: 0; background: var(--color-overlay); animation: pm-fade-in var(--dur) var(--ease-out); }
+.install-sheet { position: relative; width: 100%; max-width: 440px; margin: 16px; margin-block-end: calc(16px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px; padding: 16px 20px 20px; padding-inline-end: 8px; background: var(--color-surface-raised); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-panel); box-shadow: var(--shadow-float); animation: pm-sheet-in var(--dur) var(--ease-out); }
+.install-head { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.install-title { font-weight: 500; font-size: 17px; }
+.install-lead { margin: 0; padding-inline-end: 12px; font-size: 15px; line-height: 1.5; }
+.install-steps { margin: 0; padding: 0; padding-inline-end: 12px; list-style: none; display: flex; flex-direction: column; gap: 10px; counter-reset: step; }
+.install-steps li { display: flex; align-items: center; gap: 12px; font-size: 15px; line-height: 1.45; }
+.install-steps strong { font-weight: 600; }
+.install-step-icon { flex: none; width: 36px; height: 36px; border-radius: var(--radius-sm); border: 1px solid var(--color-border-strong); display: grid; place-items: center; color: var(--color-primary); }
+.install-note { margin: 0; padding-block-start: 12px; padding-inline-end: 12px; border-block-start: 1px solid var(--color-border); font-size: 13px; line-height: 1.55; color: var(--color-text-subtle); }
+@media (prefers-reduced-motion: reduce) { .install-sheet, .install-backdrop { animation: none; } }
