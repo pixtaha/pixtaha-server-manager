@@ -65,6 +65,7 @@ cs = [
     c(5, "supabase-pooler", "supabase/supavisor:2.9.5", ports=dict(pub(5432), **pub(6543)), labels={"com.docker.compose.project": "demo"}),
     c(6, "rembg", "danielgatis/rembg", ports=pub(7000)),
     c(7, "n8n-alpha-old", "n8nio/n8n", status="exited", policy="no", exit_code=0),
+    c(8, "n8n-byid", "f9a15cc65378", mem=512 * 1048576, ports=loc(5679), mounts=vol(n8n_db("byid", 2, 0, 0, 0))),
 ]
 os.makedirs(os.path.join(root, "pgdata"), exist_ok=True)
 with open(os.path.join(root, "pgdata", "PG_VERSION"), "w") as f:

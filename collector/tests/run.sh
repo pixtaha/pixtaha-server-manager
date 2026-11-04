@@ -29,6 +29,7 @@ n8n = {i["name"]: i for i in p["blocks"]["n8n"]["instances"]}
 assert n8n["n8n-alpha"]["workflows_total"] == 12 and n8n["n8n-alpha"]["executions_ok_24h"] == 340
 assert n8n["n8n-heavy"]["executions_failed_24h"] == 7
 assert n8n["n8n-shared"]["workflows_total"] is None
+assert "n8n-byid" in n8n, "n8n started from an image ID was not detected"
 assert len(p["kpis"]["cpu_hourly_pct"]) == 24
 print("payload ok:", p["status"]["overall"], len(p["attention"]), "attention items")
 EOF
