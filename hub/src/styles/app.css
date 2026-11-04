@@ -537,3 +537,9 @@ button { font: inherit; }
 .install-step-icon { flex: none; width: 36px; height: 36px; border-radius: var(--radius-sm); border: 1px solid var(--color-border-strong); display: grid; place-items: center; color: var(--color-primary); }
 .install-note { margin: 0; padding-block-start: 12px; padding-inline-end: 12px; border-block-start: 1px solid var(--color-border); font-size: 13px; line-height: 1.55; color: var(--color-text-subtle); }
 @media (prefers-reduced-motion: reduce) { .install-sheet, .install-backdrop { animation: none; } }
+
+/* ---------- daily reports ---------- */
+.page-sub { margin: 6px 0 0; font-size: 14px; color: var(--color-text-muted); max-width: 640px; }
+.chip-row { display: flex; gap: 8px; overflow-x: auto; padding-block-end: 2px; }
+a.chip { text-decoration: none; white-space: nowrap; flex: none; }
+a.chip[aria-current="page"] { border-color: var(--color-text-subtle); background: var(--color-surface-sunken); }

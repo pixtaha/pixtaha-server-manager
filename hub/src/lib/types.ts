@@ -307,3 +307,21 @@ export interface AlertsSnapshot {
   checks: Record<string, AlertCheck>;
   alerts: AlertItem[];
 }
+
+/* ------------------------------------------------------------------ */
+/* Daily reports history                                               */
+/* ------------------------------------------------------------------ */
+
+export interface ReportListItem {
+  /** payload report.id, e.g. "core-01-2026-11-05". */
+  id: string;
+  hostname: string;
+  client: string;
+  env: Env;
+  type: string;
+  generated_at: string;
+  received_at: string;
+  status: Status;
+  critical: number;
+  warning: number;
+}

@@ -2,7 +2,7 @@ import { AlertTriangle, Globe, Mail } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { StatusIcon, StatusPill, sevStatus } from "@/components/StatusPill";
-import { ago, cairoDay, cairoTime, cairoWhen, dur, mb, ms, num, uptime } from "@/lib/format";
+import { ago, cairoDay, cairoStamp, cairoTime, cairoWhen, dur, mb, ms, num, uptime } from "@/lib/format";
 import type { AttentionItem, ChangeItem, ContainerItem, DomainItem, N8nInstance, ServerDetail, Severity, Status } from "@/lib/types";
 import { ResourceChart } from "./ResourceChart";
 
@@ -86,7 +86,8 @@ function DataTable<T>({ label, cols, rows, rowKey }: { label: string; cols: Col<
 /* page                                                                */
 /* ------------------------------------------------------------------ */
 
-export function ServerDetailView({ d, now }: { d: ServerDetail; now: string }) {
+/** `asReport`: render a stored report from the history (Daily reports) instead of the live server. */
+export function ServerDetailView({ d, now, asReport }: { d: ServerDetail; now: string; asReport?: { id: string } }) {
   const { server: s, kpis: k, blocks: b, report } = d;
   const status = d.hub_status;
   const ref = report.generated_at;
@@ -101,9 +102,9 @@ export function ServerDetailView({ d, now }: { d: ServerDetail; now: string }) {
   return (
     <div className="stack detail">
       <nav aria-label="Breadcrumb" className="crumbs">
-        <Link href="/">Fleet</Link>
+        {asReport ? <Link href="/reports">Daily reports</Link> : <Link href="/">Fleet</Link>}
         <span aria-hidden>/</span>
-        <span dir="ltr" aria-current="page">{s.hostname}</span>
+        <span dir="ltr" aria-current="page">{asReport ? asReport.id : s.hostname}</span>
       </nav>
 
       {/* ---------- health header ---------- */}
@@ -122,13 +123,22 @@ export function ServerDetailView({ d, now }: { d: ServerDetail; now: string }) {
           </div>
         </div>
         <div className="health-side">
-          <span className="heartbeat" style={{ color: offline ? "var(--color-offline)" : undefined }}>
-            {offline ? <StatusIcon status="offline" size={12} /> : <span className="heartbeat-dot" aria-hidden />}
-            {offline ? "Last heartbeat" : "Heartbeat"} {ago(s.last_heartbeat_at, now)} · agent v{report.collector_version}
-          </span>
-          <Link href={`/reports?server=${encodeURIComponent(s.hostname)}`} className="px-btn px-btn--secondary">
-            <Mail size={18} strokeWidth={1.75} aria-hidden /> Today&apos;s report
-          </Link>
+          {asReport ? (
+            <>
+              <span className="heartbeat">Report of {cairoStamp(ref)} · agent v{report.collector_version}</span>
+              <Link href={`/servers/${encodeURIComponent(s.hostname)}`} className="px-btn px-btn--secondary">Current state</Link>
+            </>
+          ) : (
+            <>
+              <span className="heartbeat" style={{ color: offline ? "var(--color-offline)" : undefined }}>
+                {offline ? <StatusIcon status="offline" size={12} /> : <span className="heartbeat-dot" aria-hidden />}
+                {offline ? "Last heartbeat" : "Heartbeat"} {ago(s.last_heartbeat_at, now)} · agent v{report.collector_version}
+              </span>
+              <Link href={`/reports?server=${encodeURIComponent(s.hostname)}`} className="px-btn px-btn--secondary">
+                <Mail size={18} strokeWidth={1.75} aria-hidden /> Reports
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
