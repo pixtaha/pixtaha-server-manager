@@ -246,8 +246,10 @@ async function totpStart() {
   if (s.totp_enabled) return fail({ code: "unknown", message: "Authenticator already set up" }, 409);
   const secret = newTotpSecret();
   await db("totp_set", { id: s.user_id, secret_enc: encrypt(secret), enabled: false });
-  const uri = `otpauth://totp/${encodeURIComponent(`Pixtaha Management:${s.email}`)}?secret=${secret}&issuer=${encodeURIComponent("Pixtaha Management")}&algorithm=SHA1&digits=6&period=30`;
-  const qrSvg = await QRCode.toString(uri, { type: "svg", margin: 0, errorCorrectionLevel: "M" });
+  // SHA-1 / 6 digits / 30 s are the defaults, so they stay out of the URI to keep the QR code small.
+  const uri = `otpauth://totp/${encodeURIComponent(`Pixtaha:${s.email}`)}?secret=${secret}&issuer=Pixtaha`;
+  // Dark modules on white with a 4-module quiet zone: phone cameras need both to read the code.
+  const qrSvg = await QRCode.toString(uri, { type: "svg", margin: 4, errorCorrectionLevel: "L", color: { dark: "#000000", light: "#ffffff" } });
   return ok({ factorId: "totp", qrSvg, secret: secret.match(/.{1,4}/g)!.join(" "), sample: false });
 }
 

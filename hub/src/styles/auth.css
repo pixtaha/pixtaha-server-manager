@@ -77,6 +77,7 @@
 .totp-setup { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
 .qr { width: 148px; height: 148px; flex: none; border-radius: var(--radius-input); border: 1px solid var(--color-border-strong); background: repeating-linear-gradient(45deg, var(--color-surface-sunken) 0 6px, var(--color-surface) 6px 12px); display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; font-size: 12px; color: var(--color-text-subtle); }
 .qr-svg, .qr-svg svg { display: block; width: 100%; height: 100%; }
+.qr:has(.qr-svg) { width: 184px; height: 184px; padding: 0; overflow: hidden; background: #fff; border-color: #fff; }
 .totp-key { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 8px; }
 .totp-secret { font-family: var(--font-mono); font-size: 14px; letter-spacing: 0.04em; word-break: break-all; }
 .totp-key-actions { display: flex; gap: 8px; }
@@ -100,4 +101,5 @@
   .code-box { height: 52px; font-size: 20px; }
   .codes { padding: 16px; gap: 10px 12px; font-size: 14px; }
   .qr { width: 128px; height: 128px; }
+  .qr:has(.qr-svg) { width: 184px; height: 184px; }
 }
