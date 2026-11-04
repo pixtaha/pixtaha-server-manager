@@ -1,0 +1,22 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Server operations data: lives in the Claude Project only, never in git
+knowledge/
+ops/
+server-*.md
+changelog.md
+lessons.md
+*.tar
+*.tar.gz
+*.zip
+
+# Build
+node_modules/
+.next/
+dist/
+.DS_Store
