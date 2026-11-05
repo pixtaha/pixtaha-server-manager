@@ -7,8 +7,10 @@ import type { AlertItem, AlertsSnapshot, Env, FleetSnapshot, ReportListItem, Ser
  * service-role-only RPC functions public.sm_fleet() and public.sm_server(hostname).
  */
 
-/** A server with no report for this long shows as offline (daily report + margin). */
+/** A server with no report for this long shows as offline (daily report + margin). Collectors before 1.1.0. */
 const OFFLINE_AFTER_MS = 26 * 3600 * 1000;
+/** Collector 1.1.0+ sends a heartbeat every 5 minutes: silent for this long = offline. */
+const HEARTBEAT_OFFLINE_MS = 15 * 60 * 1000;
 
 interface FleetRow {
   hostname: string;
@@ -16,6 +18,8 @@ interface FleetRow {
   env: Env;
   last_report_at: string | null;
   last_status: Severity | null;
+  /** Null until the server runs collector 1.1.0+ (migration 0006). */
+  last_heartbeat_at?: string | null;
   open_issues: number;
   payload: Payload | null;
 }
@@ -62,8 +66,21 @@ function toStatus(sev: Severity | null | undefined): Status {
 }
 
 function hubStatus(row: FleetRow, now: number): Status {
-  if (!row.last_report_at || now - Date.parse(row.last_report_at) > OFFLINE_AFTER_MS) return "offline";
+  if (row.last_heartbeat_at) {
+    if (now - Date.parse(row.last_heartbeat_at) > HEARTBEAT_OFFLINE_MS) return "offline";
+  } else if (!row.last_report_at || now - Date.parse(row.last_report_at) > OFFLINE_AFTER_MS) return "offline";
+  if (!row.payload && !row.last_status) return "offline";
   return toStatus(row.payload?.status?.overall ?? row.last_status);
+}
+
+/** Newest sign of life: heartbeat (1.1.0+) or the daily report. */
+function lastSeen(row: FleetRow): string | null {
+  return row.last_heartbeat_at ?? row.last_report_at;
+}
+
+function offlineNote(row: FleetRow): string {
+  if (row.last_heartbeat_at) return "No heartbeat for over 15 minutes";
+  return row.last_report_at ? "No report in the last 26 hours" : "Waiting for the first report";
 }
 
 function pct(part: number | null | undefined, total: number | null | undefined): number | null {
@@ -121,9 +138,7 @@ function summarize(row: FleetRow, now: number): ServerSummary {
   const top = att[0];
   const note =
     status === "offline"
-      ? row.last_report_at
-        ? "No report in the last 26 hours"
-        : "Waiting for the first report"
+      ? offlineNote(row)
       : top
         ? (CHECKS[attentionId(top)]?.name ?? String(top.title ?? attentionId(top)))
         : "All checks passed";
@@ -142,7 +157,7 @@ function summarize(row: FleetRow, now: number): ServerSummary {
     alertsWarning: count("warning"),
     containersUp: p?.blocks?.containers?.running ?? 0,
     containersTotal: p?.blocks?.containers?.total ?? 0,
-    lastSeenAt: row.last_report_at ?? new Date(0).toISOString(),
+    lastSeenAt: lastSeen(row) ?? new Date(0).toISOString(),
   };
 }
 
@@ -175,7 +190,7 @@ function toDetail(p: Payload, heartbeatAt: string, status: Status): ServerDetail
 export async function liveServer(hostname: string): Promise<ServerDetail | null> {
   const row = await rpc<ServerRow | null>("sm_server", { p_hostname: hostname });
   if (!row || !row.payload) return null;
-  return toDetail(row.payload, row.last_report_at ?? row.payload.report.generated_at, hubStatus(row, Date.now()));
+  return toDetail(row.payload, lastSeen(row) ?? row.payload.report.generated_at, hubStatus(row, Date.now()));
 }
 
 export async function liveReports(limit = 300): Promise<ReportListItem[]> {
@@ -210,8 +225,8 @@ export async function liveAlerts(): Promise<AlertsSnapshot> {
     if (hubStatus(s, now) === "offline") {
       alerts.push({
         id: `${s.hostname}|agent.heartbeat`, check_id: "agent.heartbeat", severity: "offline", hostname: s.hostname,
-        detail: s.last_report_at ? "No report in the last 26 hours" : "Waiting for the first report",
-        first_seen_at: s.last_report_at ?? new Date(now).toISOString(), last_seen_at: new Date(now).toISOString(),
+        detail: offlineNote(s),
+        first_seen_at: lastSeen(s) ?? new Date(now).toISOString(), last_seen_at: new Date(now).toISOString(),
         occurrences: 1, state: "open",
       });
     }

@@ -3,7 +3,8 @@
 
 Read-only server monitor. Two jobs, both run by systemd timers:
 
-  sample   every 5 minutes: CPU, RAM, disk and container state -> local state
+  sample   every 5 minutes: CPU, RAM, disk and container state -> local state,
+           then critical alert checks + heartbeat -> n8n alert webhook
   report   once a day (08:55 Africa/Cairo): builds payload v1 and posts it to n8n
 
 It never changes anything on the server. It only reads /proc, config files and
@@ -37,7 +38,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-VERSION = "1.0.3"
+VERSION = "1.1.0"
 SCHEMA = "1.0"
 
 CONFIG_FILE = os.environ.get("PIXTAHA_CONFIG", "/etc/pixtaha-collector/config.env")
@@ -419,6 +420,7 @@ def take_sample():
         "ram_mb": mem["used_mb"], "swap_mb": mem["swap_used_mb"],
         "disk": disk["used_pct"], "disk_gb": disk["used_gb"],
     }
+    cs = []
     if shutil.which("docker"):
         cs = docker_inspect_all()
         if cs:
@@ -440,7 +442,7 @@ def take_sample():
         f.write("\n".join(kept) + "\n")
     os.chmod(tmp, 0o600)
     os.replace(tmp, path)
-    return sample
+    return sample, cs
 
 
 def load_samples(start, end):
@@ -1550,12 +1552,242 @@ def post_json(url, token, body, attempts=3, backoff=60):
     raise RuntimeError("webhook failed after %d attempts: %s" % (attempts, last))
 
 
+# --------------------------------------------------------------------------- real-time critical alerts
+
+ALERT_FILE = "alerts.json"
+ALERT_CAP = 10              # max alerts (and max resolved) per POST
+ALERT_DEBOUNCE = 2          # samples a condition must hold before it is sent
+RESOLVE_AFTER = 2           # samples a sent alert must be gone before "resolved" is sent
+OOM_HOLD_S = 1800           # an OOM kill stays an active condition for 30 min
+DOMAIN_EVERY_S = 900        # domain checks at most every 15 min
+DOMAIN_BUDGET_S = 6         # wall-clock budget for one round of domain checks
+ESSENTIAL = re.compile(r"(^|[/_.-])n8n([_.:-]|$)")
+
+
+def alert_url(cfg):
+    if cfg.get("PIXTAHA_ALERT_URL"):
+        return cfg["PIXTAHA_ALERT_URL"]
+    base = cfg.get("PIXTAHA_WEBHOOK_URL") or ""
+    return base.replace("server-daily-report", "server-alert") if "server-daily-report" in base else None
+
+
+def is_essential(c):
+    """n8n or database container: expected to be running all the time."""
+    image = ((c.get("Config") or {}).get("Image") or "").lower()
+    name = (c.get("Name") or "").lstrip("/").lower()
+    return bool(ESSENTIAL.search(image) or ESSENTIAL.search(name) or DB_IMAGE.search(image.split("@")[0]))
+
+
+def recent_oom_ids(minutes=10):
+    txt = run(["journalctl", "-k", "--since", "-%dmin" % minutes, "--no-pager", "-o", "cat"], timeout=5) or ""
+    ids = set()
+    for line in txt.splitlines():
+        if "oom-kill:" in line:
+            m = re.search(r"docker[-/]([0-9a-f]{64})", line)
+            if m:
+                ids.add(m.group(1))
+    return ids
+
+
+def failed_units():
+    out = run(["systemctl", "list-units", "--state=failed", "--no-legend", "--plain"], timeout=5)
+    if out is None:
+        return None
+    return sorted({l.split()[0] for l in out.splitlines() if l.strip() and not l.startswith("0 ")})
+
+
+def quick_domain_ok(name):
+    """True if the domain resolves and answers HTTPS with a valid certificate and a status below 500."""
+    try:
+        socket.getaddrinfo(name, 443, proto=socket.IPPROTO_TCP)
+    except (socket.gaierror, OSError):
+        return False, "does not resolve"
+    try:
+        ctx = ssl.create_default_context()
+        conn = http.client.HTTPSConnection(name, 443, timeout=4, context=ctx)
+        conn.request("HEAD", "/", headers={"User-Agent": "pixtaha-collector/" + VERSION})
+        status = conn.getresponse().status
+        conn.close()
+    except ssl.SSLError:
+        return False, "HTTPS certificate error"
+    except (OSError, http.client.HTTPException):
+        return False, "HTTPS does not answer"
+    return (status < 500), ("HTTP %d" % status)
+
+
+def domain_conditions(cfg, cs, st, now):
+    """Checks domains at most every 15 min; a domain must fail 2 checks in a row. Returns {key: alert}."""
+    dom = st.setdefault("domains", {"checked_at": 0, "fails": {}, "detail": {}})
+    if (cfg.get("PIXTAHA_ALERT_DOMAINS") or "on").lower() in ("off", "0", "no", "false"):
+        return {}
+    if now - dom.get("checked_at", 0) >= DOMAIN_EVERY_S:
+        names = sorted(domains_from_configs(cs))[:30]
+        dom["checked_at"] = now
+        if names:
+            ex = ThreadPoolExecutor(max_workers=8)
+            futs = {n: ex.submit(quick_domain_ok, n) for n in names}
+            deadline = time.time() + DOMAIN_BUDGET_S
+            fails, detail = {}, {}
+            for n, f in futs.items():
+                try:
+                    ok, why = f.result(timeout=max(0.1, deadline - time.time()))
+                except Exception:
+                    ok, why = None, None  # no answer within the budget: unknown, keep the previous count
+                if ok is None:
+                    if n in dom["fails"]:
+                        fails[n], detail[n] = dom["fails"][n], dom["detail"].get(n, "")
+                elif not ok:
+                    fails[n], detail[n] = dom["fails"].get(n, 0) + 1, why
+            ex.shutdown(wait=False)
+            dom["fails"], dom["detail"] = fails, detail
+        else:
+            dom["fails"], dom["detail"] = {}, {}
+    return {"domain.down:" + n: {"severity": "critical", "title": "Domain %s is down" % n,
+                                 "detail": dom["detail"].get(n) or "HTTPS check failed"}
+            for n, k in dom["fails"].items() if k >= 2}
+
+
+def alert_conditions(cfg, sample, cs, st, now):
+    """Current critical conditions as {key: {severity, title, detail}}. Names and numbers only, no secrets."""
+    cur = {}
+
+    def add(key, title, detail):
+        cur[key] = {"severity": "critical", "title": title, "detail": detail}
+
+    disk = sample.get("disk")
+    if disk is not None and disk >= 90:
+        add("host.disk", "Disk %d%% full" % int(disk), "Root filesystem %.1f%% used (%s GB)." % (disk, sample.get("disk_gb")))
+    ram, swap = sample.get("ram"), sample.get("swap_mb") or 0
+    if ram is not None and ram >= 95 and swap > 0:
+        add("host.ram", "RAM %d%% with swap in use" % int(ram), "RAM %.1f%% used, %d MB swap in use." % (ram, swap))
+
+    # containers
+    seen_running = set(st.get("running", []))
+    oom_ids = recent_oom_ids() if cs else set()
+    oom_hold = {k: v for k, v in st.get("oom", {}).items() if now - v < OOM_HOLD_S}
+    oom_marks = st.get("oom_marks", {})
+    names_now = set()
+    for c in cs:
+        name = (c.get("Name") or "").lstrip("/")
+        stt = c.get("State") or {}
+        status = stt.get("Status")
+        names_now.add(name)
+        if stt.get("OOMKilled") or c.get("Id") in oom_ids:
+            mark = "%s|%s" % (stt.get("StartedAt"), stt.get("FinishedAt"))  # one alert per kill, not per sample
+            if oom_marks.get(name) != mark:
+                oom_marks[name] = mark
+                oom_hold[name] = now
+        if status == "running":
+            seen_running.add(name)
+            continue
+        policy = ((c.get("HostConfig") or {}).get("RestartPolicy") or {}).get("Name") or "no"
+        bad = status in ("exited", "dead", "restarting")
+        if bad and (name in seen_running or (is_essential(c) and policy != "no")):
+            what = "n8n / database container" if is_essential(c) else "Container"
+            add("container.down:" + name, "%s %s is %s" % (what, name, status),
+                "State %s, exit code %s, restarts %s." % (status, stt.get("ExitCode"), c.get("RestartCount", 0)))
+    for name, at in oom_hold.items():
+        add("container.oom:" + name, "Container %s was OOM-killed" % name,
+            "Out of memory kill at %s." % iso(at))
+    st["running"] = sorted(seen_running & names_now)  # forget removed containers
+    st["oom"] = oom_hold
+    st["oom_marks"] = {k: v for k, v in oom_marks.items() if k in names_now}
+
+    # systemd: only units that failed after the collector started watching
+    units = failed_units()
+    if units is not None:
+        if "units_baseline" not in st:
+            st["units_baseline"] = units
+        base = set(st["units_baseline"]) & set(units)  # a baseline unit that recovers is watched again
+        st["units_baseline"] = sorted(base)
+        for u in units:
+            if u not in base:
+                add("unit.failed:" + u, "Service %s failed" % u, "systemd unit %s is in failed state." % u)
+
+    cur.update(domain_conditions(cfg, cs, st, now))
+    return cur
+
+
+def plan_alerts(st, cur, now):
+    """Debounce + dedupe. Mutates counters in st; returns (alerts, resolved) to send. Sent state is applied
+    only after a successful POST (commit_alerts), so a failed POST is retried by the next sample."""
+    streak, sent, gone = st.setdefault("streak", {}), st.setdefault("sent", {}), st.setdefault("gone", {})
+    for k in list(streak):
+        if k not in cur:
+            del streak[k]
+    for k in cur:
+        streak[k] = streak.get(k, 0) + 1
+        gone.pop(k, None)
+    for k in sent:
+        if k not in cur:
+            gone[k] = gone.get(k, 0) + 1
+    for k in list(gone):
+        if k not in sent:
+            del gone[k]
+    alerts = [dict(key=k, **cur[k]) for k in sorted(cur) if streak[k] >= ALERT_DEBOUNCE and k not in sent][:ALERT_CAP]
+    resolved = [{"key": k, "title": sent[k]["title"]} for k in sorted(gone) if gone[k] >= RESOLVE_AFTER][:ALERT_CAP]
+    return alerts, resolved
+
+
+def commit_alerts(st, alerts, resolved, at):
+    for a in alerts:
+        st["sent"][a["key"]] = {"title": a["title"], "at": at}
+    for r in resolved:
+        st["sent"].pop(r["key"], None)
+        st["gone"].pop(r["key"], None)
+
+
+def post_alert(url, token, body):
+    """One try, 10 s timeout. Returns the HTTP status or None."""
+    data = json.dumps(body, separators=(",", ":")).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method="POST", headers={
+        "Content-Type": "application/json", "X-Report-Token": token, "User-Agent": "pixtaha-collector/" + VERSION})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return r.status
+    except urllib.error.HTTPError as e:
+        return e.code
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
+def run_alerts(cfg, sample, cs):
+    now = time.time()
+    with StateLock():
+        st = load_json(ALERT_FILE, {})
+        cur = alert_conditions(cfg, sample, cs, st, now)
+        alerts, resolved = plan_alerts(st, cur, now)
+        save_json(ALERT_FILE, st)
+    at = iso(now)
+    body = {"schema_version": SCHEMA, "hostname": cfg.get("PIXTAHA_HOSTNAME") or socket.gethostname(),
+            "client": cfg.get("PIXTAHA_CLIENT", "Unknown"), "env": cfg.get("PIXTAHA_ENV", "production"),
+            "at": at, "collector": VERSION, "heartbeat": True, "alerts": alerts, "resolved": resolved}
+    url, token = alert_url(cfg), cfg.get("PIXTAHA_REPORT_TOKEN")
+    if not url or not token:
+        log("alerts: no alert URL or token, heartbeat not sent (%d active)" % len(cur))
+        return
+    code = post_alert(url, token, body)
+    if code and 200 <= code < 300:
+        with StateLock():
+            st = load_json(ALERT_FILE, {})
+            st.setdefault("sent", {})
+            st.setdefault("gone", {})
+            commit_alerts(st, alerts, resolved, at)
+            st["last_post"] = {"at": at, "http": code}
+            save_json(ALERT_FILE, st)
+    log("heartbeat: HTTP %s, %d active, %d new alerts, %d resolved" % (code, len(cur), len(alerts), len(resolved)))
+
+
 # --------------------------------------------------------------------------- CLI
 
 def cmd_sample(_args):
     with StateLock():
-        s = take_sample()
+        s, cs = take_sample()
     log("sample ok: cpu=%s ram=%s disk=%s containers=%d" % (s.get("cpu"), s.get("ram"), s.get("disk"), len(s.get("c") or [])))
+    try:
+        run_alerts(load_config(), s, cs)
+    except Exception as e:  # alerts must never fail the sample
+        log("alerts skipped: %s" % type(e).__name__)
 
 
 def cmd_report(args):
@@ -1600,6 +1832,11 @@ def cmd_status(_args):
     print("samples:      %d (last %s)" % (len(lines), json.loads(lines[-1])["t"] if lines else "never"))
     last = load_json("last_report.json", None)
     print("last report:  " + ("%s at %s, HTTP %s, %s" % (last["id"], last["at"], last["http"], last["status"]) if last else "never"))
+    al = load_json(ALERT_FILE, {})
+    print("alert url:    " + (alert_url(cfg) or "(not set)"))
+    lp = al.get("last_post")
+    print("heartbeat:    " + ("%s, HTTP %s" % (lp["at"], lp["http"]) if lp else "never sent"))
+    print("open alerts:  " + (", ".join(sorted(al.get("sent", {}))) or "none"))
 
 
 def main():

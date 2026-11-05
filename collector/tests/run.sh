@@ -33,5 +33,6 @@ assert "n8n-byid" in n8n, "n8n started from an image ID was not detected"
 assert len(p["kpis"]["cpu_hourly_pct"]) == 24
 print("payload ok:", p["status"]["overall"], len(p["attention"]), "attention items")
 EOF
+python3 "$HERE/test_alerts.py"
 node "$REPO/email/render.js" "$FX/payload.json" "$FX/email.html" light
 echo "all collector tests passed"

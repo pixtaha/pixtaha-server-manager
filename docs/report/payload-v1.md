@@ -80,3 +80,6 @@ Contract between the collector on each server, the n8n workflow "Server Manager"
 
 ## Example
 A full example payload with real server data is kept in the private Claude Project, not in this public repo.
+
+## Real-time alerts (collector 1.1.0+)
+Separate from the daily report: every 5-minute sample posts a heartbeat to `POST https://<n8n-host>/webhook/server-alert` (same `X-Report-Token`), body `{schema_version:"1.0", hostname, client, env, at, collector, heartbeat:true, alerts:[{key,severity,title,detail}], resolved:[{key,title}]}`. Details in `collector/README.md` and `docs/n8n/README.md`.
