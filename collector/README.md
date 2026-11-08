@@ -23,6 +23,8 @@ Daily checks: containers (state, restarts, OOM kills, crash cause from the last 
 - The database stores only the sha256 of the report token (`server_manager.set_live_key`).
 - `PIXTAHA_BACKUP_IGNORE` (comma-separated): retired backup folders that should not be reported as out of date.
 - Database ports that the `DOCKER-USER` chain limits to known sources are not flagged as public.
+- Backup naming: a backup file whose name starts with the exact container name (`postgres-all.sql.gz`, `supabase-db.sql.gz`, `n8n-new-zain.sqlite.gz`) is credited to that container, even when the name is generic (1.2.1+).
+- Domains come from enabled nginx sites, Caddy, and Traefik labels of running containers only (1.2.1+).
 
 ## Real-time alerts (1.1.0+)
 Every sample also runs a few fast critical checks and posts a heartbeat to the n8n workflow "Server Manager Alerts", which sends new problems to Telegram.

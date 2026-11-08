@@ -38,7 +38,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 SCHEMA = "1.0"
 
 CONFIG_FILE = os.environ.get("PIXTAHA_CONFIG", "/etc/pixtaha-collector/config.env")
@@ -805,6 +805,9 @@ def build_databases(containers, n8n_insts, backups_files):
         fam = "pg" if engine in ("Postgres", "Supabase") else base
         project = ((c.get("Config") or {}).get("Labels") or {}).get("com.docker.compose.project")
         last = newest_for(backups_files, name_tokens(name, project), hint, families.get(fam, 0) == 1)
+        exact = newest_exact(backups_files, name)
+        if exact and (last is None or exact > last):
+            last = exact
         dbs.append({
             "name": name, "engine": engine, "version": tag if tag not in (None, "latest", "digest") else None,
             "status": "info" if (engine == "Redis" and last is None) else backup_sev(last), "size_mb": size, "growth_mb_24h": None,
@@ -846,6 +849,20 @@ def name_tokens(*names):
             if len(t) >= 4 and t not in GENERIC_WORDS:
                 out.add(t)
     return out
+
+
+def newest_exact(files, name):
+    """Newest backup file whose file name starts with the exact container name, e.g. postgres-all.sql.gz or
+    postgres.sql.gz for a container called 'postgres' (generic names have no distinctive tokens)."""
+    name = (name or "").lower()
+    if len(name) < 3:
+        return None
+    best = None
+    for path, mt, _ in files:
+        base = os.path.basename(path).lower()
+        if base.startswith(name) and base[len(name):len(name) + 1] in (".", "-", "_") and (best is None or mt > best):
+            best = mt
+    return best
 
 
 def newest_for(files, tokens, hint, allow_generic):
@@ -1215,6 +1232,8 @@ def domains_from_configs(containers):
                     found.setdefault(re.sub(r"^https?://", "", name).split(":")[0], "caddy")
             depth += s.count("{") - s.count("}")
     for c in containers:
+        if (c.get("State") or {}).get("Status") not in (None, "running", "restarting"):
+            continue  # a stopped container serves no domain
         for k, v in ((c.get("Config") or {}).get("Labels") or {}).items():
             if k.startswith("traefik.http.routers.") and k.endswith(".rule"):
                 for hm in re.finditer(r"Host\(([^)]*)\)", v):
