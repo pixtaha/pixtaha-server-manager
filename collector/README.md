@@ -12,6 +12,18 @@ On the first day, hours without samples are filled from sysstat (`sadf`) when it
 
 Daily checks: containers (state, restarts, OOM kills, crash cause from the last 24 h of logs, pinned image, memory limit, published ports), n8n instances (version, SQLite size and growth, workflows, executions ok/failed in 24 h, read with `mode=ro`), databases (engine, version, data size, newest matching backup file), backups folders, systemd timers and cron jobs, failed units, public listeners, SSH settings (`sshd -T`), failed and accepted SSH logins, new login IPs, firewall, executables in /tmp, pending updates, reboot required, domains from nginx / Caddy / Traefik labels (DNS, HTTPS, certificate days, renewal), and changes since the previous report (containers added/removed, image changes, ports opened/closed, reboot).
 
+## Live dashboard (1.2.0+)
+| Unit | When | Job |
+|---|---|---|
+| `pixtaha-collector-live.service` | always, every 5 s | CPU, RAM, swap, disk, load, boot time and container states to `public.sm_live` on the Supabase REST API |
+| `pixtaha-collector-refresh.timer` | 5 min after the previous refresh | the full checks as a `refresh` report to `public.sm_push_report`: no email, no state change |
+
+- Turn it on with `--live-url https://<supabase-host>` on install (the anon key is asked for without echo). Without it the live service exits and the refresh timer sends nothing.
+- "Re-check now" in the hub: the next live push gets `recheck: true` and starts one refresh report (`systemctl start pixtaha-collector-refresh.service`).
+- The database stores only the sha256 of the report token (`server_manager.set_live_key`).
+- `PIXTAHA_BACKUP_IGNORE` (comma-separated): retired backup folders that should not be reported as out of date.
+- Database ports that the `DOCKER-USER` chain limits to known sources are not flagged as public.
+
 ## Real-time alerts (1.1.0+)
 Every sample also runs a few fast critical checks and posts a heartbeat to the n8n workflow "Server Manager Alerts", which sends new problems to Telegram.
 
@@ -47,7 +59,8 @@ The installer asks for the report token without echoing it. Running it again upg
 
 ## Use
 ```bash
-pixtaha-collector status                      # config (no token), samples, last report, heartbeat, open alerts
+pixtaha-collector status                      # config (no token), samples, last report, heartbeat, open alerts, live push
+pixtaha-collector report --refresh --dry-run  # preview a refresh report
 pixtaha-collector report --dry-run | less     # preview the payload, sends nothing, keeps state
 pixtaha-collector report --id-suffix test     # send an extra report now (unique report.id)
 journalctl -u pixtaha-collector-report -n 50  # last runs
@@ -64,6 +77,9 @@ bash /opt/pixtaha-collector/uninstall.sh      # remove (add --purge to delete co
 | `PIXTAHA_HOSTNAME` | override the reported hostname |
 | `PIXTAHA_ALERT_URL` | alert / heartbeat webhook (default derived from `PIXTAHA_WEBHOOK_URL`) |
 | `PIXTAHA_ALERT_DOMAINS` | `off` to skip the 15-minute domain check in alerts |
+| `PIXTAHA_LIVE_URL` / `PIXTAHA_LIVE_KEY` | Supabase URL and anon key for the live dashboard (set by `--live-url`) |
+| `PIXTAHA_LIVE_INTERVAL` | live push interval in seconds (default 5, 2-60) |
+| `PIXTAHA_BACKUP_IGNORE` | comma-separated backup folders to leave out (retired) |
 
 ## Limits in v1
 - n8n on Postgres: workflow and execution counts are `null` (they need database access).

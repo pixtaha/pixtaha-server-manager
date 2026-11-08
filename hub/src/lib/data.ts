@@ -1,8 +1,8 @@
 import "server-only";
 import { connection } from "next/server";
-import { liveAlerts, liveConfigured, liveFleet, liveReport, liveReports, liveServer } from "./live";
+import { liveAlerts, liveConfigured, liveFleet, liveNowFleet, liveNowServer, liveRecheck, liveReport, liveReports, liveServer } from "./live";
 import { SAMPLE_ALERTS, SAMPLE_DETAILS, SAMPLE_FLEET } from "./sample-data";
-import type { AlertsSnapshot, FleetSnapshot, ReportListItem, ServerDetail } from "./types";
+import type { AlertsSnapshot, FleetSnapshot, LiveState, ReportListItem, ServerDetail } from "./types";
 
 /**
  * Data access for the hub. With SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY set, it reads the
@@ -18,6 +18,17 @@ export async function getFleet(): Promise<FleetSnapshot> {
 export async function getServer(hostname: string): Promise<ServerDetail | null> {
   await connection();
   return liveConfigured() ? liveServer(hostname) : (SAMPLE_DETAILS[hostname] ?? null);
+}
+
+/** Live channel for the browser poll. `null` in sample mode (nothing to poll). */
+export async function getLive(hostname?: string): Promise<LiveState | LiveState[] | null> {
+  if (!liveConfigured()) return null;
+  return hostname ? liveNowServer(hostname) : liveNowFleet();
+}
+
+export async function requestRecheck(hostname: string): Promise<boolean> {
+  if (!liveConfigured()) return false;
+  return liveRecheck(hostname);
 }
 
 /** All alerts (open, acknowledged, resolved). Grouping of duplicates happens in the UI. */

@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # Pixtaha Management collector installer.
 #
-# Installs a read-only monitor: /opt/pixtaha-collector, two systemd timers
-# (5-minute sample, daily report at 08:55 Africa/Cairo) and a config file
-# with the webhook token (mode 600). It does not change anything else.
+# Installs a read-only monitor: /opt/pixtaha-collector, systemd units
+# (5-minute sample, daily report at 08:55 Africa/Cairo, 5-minute refresh report and
+# the live service for the dashboard) and a config file with the token (mode 600).
+# It does not change anything else.
 #
 # Usage (as root):
 #   curl -fsSL https://raw.githubusercontent.com/pixtaha/pixtaha-server-manager/<ref>/collector/install.sh -o /tmp/pixtaha-install.sh
 #   bash /tmp/pixtaha-install.sh --ref <ref> --client "Client name" --env production --webhook https://<n8n-host>/webhook/server-daily-report
+#   Live dashboard (1.2.0+): add --live-url https://<supabase-host> ; the Supabase anon key is asked for
+#   without echo (or kept from the existing config).
 # The token is asked for interactively and is never echoed or passed as an argument.
 set -euo pipefail
 
@@ -15,7 +18,9 @@ REF="main"
 CLIENT=""
 ENVIRONMENT=""
 WEBHOOK=""
+LIVE_URL=""
 RESET_TOKEN=0
+RESET_LIVE_KEY=0
 REPO_RAW="https://raw.githubusercontent.com/pixtaha/pixtaha-server-manager"
 
 APP_DIR="/opt/pixtaha-collector"
@@ -33,8 +38,10 @@ while [ $# -gt 0 ]; do
     --client) CLIENT="$2"; shift 2 ;;
     --env) ENVIRONMENT="$2"; shift 2 ;;
     --webhook) WEBHOOK="$2"; shift 2 ;;
+    --live-url) LIVE_URL="$2"; shift 2 ;;
     --reset-token) RESET_TOKEN=1; shift ;;
-    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+    --reset-live-key) RESET_LIVE_KEY=1; shift ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) die "unknown option: $1" ;;
   esac
 done
@@ -50,7 +57,9 @@ old() { [ -f "$CONF" ] && sed -n "s/^$1=//p" "$CONF" | head -n 1 || true; }
 [ -n "$CLIENT" ] || CLIENT="$(old PIXTAHA_CLIENT)"
 [ -n "$ENVIRONMENT" ] || ENVIRONMENT="$(old PIXTAHA_ENV)"
 [ -n "$WEBHOOK" ] || WEBHOOK="$(old PIXTAHA_WEBHOOK_URL)"
+[ -n "$LIVE_URL" ] || LIVE_URL="$(old PIXTAHA_LIVE_URL)"
 TOKEN="$(old PIXTAHA_REPORT_TOKEN)"
+LIVE_KEY="$(old PIXTAHA_LIVE_KEY)"
 
 ask() {
   local prompt="$1" var
@@ -69,6 +78,16 @@ if [ -z "$TOKEN" ] || [ "$RESET_TOKEN" -eq 1 ]; then
   echo
 fi
 [ -n "$TOKEN" ] || die "report token is required"
+
+if [ -n "$LIVE_URL" ]; then
+  LIVE_URL="${LIVE_URL%/}"
+  case "$LIVE_URL" in https://*) ;; *) die "live URL must start with https://" ;; esac
+  if [ -z "$LIVE_KEY" ] || [ "$RESET_LIVE_KEY" -eq 1 ]; then
+    read -r -s -p "Live key (Supabase anon key): " LIVE_KEY </dev/tty
+    echo
+  fi
+  [ -n "$LIVE_KEY" ] || die "live key is required with --live-url"
+fi
 
 say "Downloading collector ($REF)"
 TMP="$(mktemp -d)"
@@ -91,14 +110,18 @@ umask 077
   echo "PIXTAHA_ENV=$ENVIRONMENT"
   echo "PIXTAHA_WEBHOOK_URL=$WEBHOOK"
   echo "PIXTAHA_REPORT_TOKEN=$TOKEN"
-  for k in PIXTAHA_PUBLIC_IP PIXTAHA_EXTRA_IPS PIXTAHA_BACKUP_DIRS PIXTAHA_DASHBOARD_URL PIXTAHA_HOSTNAME PIXTAHA_ALERT_URL PIXTAHA_ALERT_DOMAINS; do
+  if [ -n "$LIVE_URL" ]; then
+    echo "PIXTAHA_LIVE_URL=$LIVE_URL"
+    echo "PIXTAHA_LIVE_KEY=$LIVE_KEY"
+  fi
+  for k in PIXTAHA_PUBLIC_IP PIXTAHA_EXTRA_IPS PIXTAHA_BACKUP_DIRS PIXTAHA_BACKUP_IGNORE PIXTAHA_DASHBOARD_URL PIXTAHA_HOSTNAME PIXTAHA_ALERT_URL PIXTAHA_ALERT_DOMAINS PIXTAHA_LIVE_INTERVAL; do
     v="$(old "$k")"
     [ -n "$v" ] && echo "$k=$v"
   done
 } > "$CONF.tmp"
 chmod 600 "$CONF.tmp"
 mv "$CONF.tmp" "$CONF"
-unset TOKEN
+unset TOKEN LIVE_KEY
 
 say "Installing systemd timers"
 REPORT_CAL="*-*-* 08:55:00 Africa/Cairo"
@@ -171,14 +194,71 @@ RandomizedDelaySec=60
 WantedBy=timers.target
 EOF
 
+{
+  echo "[Unit]"
+  echo "Description=Pixtaha collector: refresh report for the live dashboard (read-only, no email)"
+  echo "Wants=network-online.target"
+  echo "After=network-online.target"
+  echo
+  common_service
+  echo "ExecStart=$BIN report --refresh"
+  echo "TimeoutStartSec=600"
+} > "$UNIT_DIR/pixtaha-collector-refresh.service"
+
+cat > "$UNIT_DIR/pixtaha-collector-refresh.timer" <<EOF
+[Unit]
+Description=Pixtaha collector: refresh report 5 minutes after the previous one
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=5min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target
+EOF
+
+cat > "$UNIT_DIR/pixtaha-collector-live.service" <<EOF
+[Unit]
+Description=Pixtaha collector: live snapshot every 5 seconds (read-only)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=$BIN live
+Restart=on-failure
+RestartSec=15
+Nice=10
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=read-only
+StateDirectory=pixtaha-collector
+StateDirectoryMode=0700
+ReadWritePaths=/var/lib/pixtaha-collector
+Environment=DOCKER_CONFIG=/var/lib/pixtaha-collector/docker
+MemoryMax=96M
+CPUQuota=10%
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 systemctl daemon-reload
-systemctl enable --now pixtaha-collector-sample.timer pixtaha-collector-report.timer >/dev/null
+systemctl enable --now pixtaha-collector-sample.timer pixtaha-collector-report.timer pixtaha-collector-refresh.timer >/dev/null
+systemctl enable pixtaha-collector-live.service >/dev/null
+systemctl restart pixtaha-collector-live.service
 systemctl start pixtaha-collector-sample.service
 
 say "Installed"
 "$BIN" status
 echo
 echo "Next report: $(systemctl show pixtaha-collector-report.timer -p NextElapseUSecRealtime --value)"
+if [ -n "$LIVE_URL" ]; then
+  echo "Live dashboard: on (every 5 s). Check with: pixtaha-collector status   (live push: ... ok)"
+else
+  echo "Live dashboard: off (run again with --live-url to turn it on)"
+fi
 echo "Send a test report now:  pixtaha-collector report --id-suffix test"
 echo "Preview without sending: pixtaha-collector report --dry-run | less"
 echo "Remove:                  bash $APP_DIR/uninstall.sh   (add --purge to delete config and state)"

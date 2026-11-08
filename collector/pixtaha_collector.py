@@ -38,7 +38,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 SCHEMA = "1.0"
 
 CONFIG_FILE = os.environ.get("PIXTAHA_CONFIG", "/etc/pixtaha-collector/config.env")
@@ -878,10 +878,14 @@ def backup_dirs(cfg):
         d = d.strip()
         if d and os.path.isdir(d):
             dirs.add(os.path.realpath(d))
+    # retired folders the operator keeps but no longer fills (PIXTAHA_BACKUP_IGNORE)
+    ignore = [os.path.realpath(d.strip()) for d in (cfg.get("PIXTAHA_BACKUP_IGNORE") or "").split(",") if d.strip()]
     # drop nested duplicates and OS package backups
     out = []
     for d in sorted(dirs):
         if d.startswith("/var/backups") and not d.startswith("/var/backups/pixtaha"):
+            continue
+        if any(d == i or d.startswith(i + "/") for i in ignore):
             continue
         if any(d.startswith(o + "/") for o in out):
             continue
@@ -1127,6 +1131,45 @@ def firewall_active():
     return False if out is not None or rules else None
 
 
+def docker_user_restrictions(text=None):
+    """Ports that the DOCKER-USER chain limits to known sources: {port: [allowed sources]}.
+    A port counts as restricted when a DROP / REJECT rule matches it for every other source
+    (no -s, or a negated ! -s). Docker-published ports bypass INPUT, so this is the chain that matters."""
+    if text is None:
+        text = run(["iptables", "-S", "DOCKER-USER"], timeout=10) or ""
+    rules = {}
+    for line in text.splitlines():
+        if not line.startswith("-A DOCKER-USER"):
+            continue
+        ports = []
+        m = re.search(r"--(?:dport|ctorigdstport|sport) (\d+)(?::(\d+))?", line)
+        if m and "--sport" not in m.group(0):
+            lo, hi = int(m.group(1)), int(m.group(2) or m.group(1))
+            ports = list(range(lo, min(hi, lo + 100) + 1))
+        mm = re.search(r"--dports (\S+)", line)
+        if mm:
+            for part in mm.group(1).split(","):
+                a, _, b = part.partition(":")
+                if a.isdigit():
+                    ports += list(range(int(a), min(int(b or a), int(a) + 100) + 1))
+        if not ports:
+            continue
+        tgt = re.search(r"-j (\w+)", line)
+        tgt = tgt.group(1) if tgt else ""
+        src = re.search(r"(!\s+)?-s (\S+)", line)
+        for port in ports:
+            r = rules.setdefault(port, {"drop": False, "allow": set()})
+            if tgt in ("DROP", "REJECT"):
+                if src is None:
+                    r["drop"] = True
+                elif src.group(1):
+                    r["drop"] = True
+                    r["allow"].add(src.group(2))
+            elif tgt in ("ACCEPT", "RETURN") and src and not src.group(1):
+                r["allow"].add(src.group(2))
+    return {p: sorted(r["allow"]) for p, r in rules.items() if r["drop"]}
+
+
 def tmp_executables():
     n = 0
     for base in ("/tmp", "/var/tmp", "/dev/shm"):
@@ -1306,7 +1349,8 @@ def build_attention(kpis, mem, disk, cont_items, cont_block, n8n_insts, dbs, dom
             "%s can use all RAM and starve the server." % names(nl), "Set mem_limit on each.")
 
     # ports
-    dbp = sorted({p["port"] for p in sec["public_ports"] if p["is_database"]})
+    dbp = sorted({p["port"] for p in sec["public_ports"] if p["is_database"] and not p.get("restricted_to")})
+    # ports limited by DOCKER-USER to known sources carry restricted_to and are not flagged
     if dbp:
         add("ports.public_database", "critical" if not fw_active else "warning",
             "Database port%s %s open on all interfaces" % ("s" if len(dbp) > 1 else "", " and ".join(map(str, dbp))),
@@ -1455,10 +1499,13 @@ def build_report(cfg, end=None):
             if not any(s["port"] == port for s in services):
                 services.append({"name": proc, "kind": "api", "status": "warning" if pid_user(pid) == "root" else "healthy",
                                  "state": "running", "user": pid_user(pid), "port": port, "public": True, "latency_ms": None})
+    restricted = docker_user_restrictions() if has_docker else {}
     for x in cont_items:
         for p in x["ports"]:
             if p["public"]:
                 public_ports[p["port"]] = {"port": p["port"], "proto": "tcp", "bind": "0.0.0.0", "owner": x["name"], "is_database": p["port"] in DB_PORTS}
+                if p["port"] in restricted:
+                    public_ports[p["port"]]["restricted_to"] = len(restricted[p["port"]])
 
     pw, root_login = sshd_settings()
     failed, methods, login_ips = scan_auth(cfg, start)
@@ -1778,6 +1825,162 @@ def run_alerts(cfg, sample, cs):
     log("heartbeat: HTTP %s, %d active, %d new alerts, %d resolved" % (code, len(cur), len(alerts), len(resolved)))
 
 
+# --------------------------------------------------------------------------- live dashboard (1.2.0+)
+# The `live` service pushes a small snapshot every 5 s straight to the Supabase REST API
+# (public.sm_live, authenticated with the report token). Refresh reports (full checks, no email)
+# go to public.sm_push_report every 5 minutes and when the hub asks for a re-check.
+
+LIVE_EVERY_S = 5
+LIVE_CONTAINERS_EVERY_S = 15
+LIVE_FILE = "live.json"
+
+
+def live_target(cfg):
+    url = (cfg.get("PIXTAHA_LIVE_URL") or "").strip().rstrip("/")
+    key = (cfg.get("PIXTAHA_LIVE_KEY") or "").strip()
+    token = cfg.get("PIXTAHA_REPORT_TOKEN") or ""
+    if not (url.startswith("https://") or url.startswith("http://127.0.0.1:")) or not key or not token:  # http only for local tests
+        return None
+    return url, key, token
+
+
+def rpc_post(target, fn, args, timeout=5, limit_kb=512):
+    """POST to /rest/v1/rpc/<fn>. Returns (http status or None, parsed JSON or None)."""
+    url, key, _token = target
+    data = json.dumps(args, separators=(",", ":")).encode("utf-8")
+    if len(data) > limit_kb * 1024:
+        return 413, None
+    req = urllib.request.Request("%s/rest/v1/rpc/%s" % (url, fn), data=data, method="POST", headers={
+        "Content-Type": "application/json", "apikey": key, "Authorization": "Bearer " + key,
+        "User-Agent": "pixtaha-collector/" + VERSION})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            body = r.read()
+            try:
+                return r.status, json.loads(body.decode("utf-8")) if body else None
+            except ValueError:
+                return r.status, None
+    except urllib.error.HTTPError as e:
+        return e.code, None
+    except (urllib.error.URLError, OSError, ValueError):
+        return None, None
+
+
+def live_containers():
+    """[(name, state)] from one cheap `docker ps`, or None without docker."""
+    if not shutil.which("docker"):
+        return None
+    out = run(["docker", "ps", "-a", "--no-trunc", "--format", "{{.Names}}\t{{.State}}"], timeout=10)
+    if out is None:
+        return None
+    items = []
+    for line in out.splitlines():
+        name, _, state = line.partition("\t")
+        if name:
+            items.append((name.strip(), (state or "").strip().lower()))
+    return sorted(items)
+
+
+def loadavg1():
+    try:
+        return float((read("/proc/loadavg", "") or "").split()[0])
+    except (IndexError, ValueError):
+        return None
+
+
+def live_snapshot(cfg, cpu, conts):
+    mem, disk, up = meminfo(), disk_root(), uptime_seconds()
+    snap = {
+        "hostname": cfg.get("PIXTAHA_HOSTNAME") or socket.gethostname(), "collector": VERSION,
+        "cpu": cpu, "ram": round(100.0 * mem["used_mb"] / mem["total_mb"], 1) if mem["total_mb"] else None,
+        "ram_mb": mem["used_mb"], "ram_total_mb": mem["total_mb"], "swap_mb": mem["swap_used_mb"],
+        "disk": disk["used_pct"], "disk_gb": disk["used_gb"], "disk_total_gb": disk["total_gb"],
+        "load1": loadavg1(), "cores": os.cpu_count(),
+        "boot_at": iso(time.time() - up) if up else None,
+    }
+    if conts is not None:
+        snap["running"] = sum(1 for _, st in conts if st == "running")
+        snap["total"] = len(conts)
+        snap["containers"] = [{"n": n[:80], "s": st[:12]} for n, st in conts[:200]]
+    return snap
+
+
+def start_refresh():
+    """Ask systemd for one refresh report (single instance); fall back to a detached process."""
+    if shutil.which("systemctl") and os.path.isdir("/run/systemd/system"):
+        if run(["systemctl", "start", "--no-block", "pixtaha-collector-refresh.service"], timeout=10) is not None:
+            return True
+    try:
+        subprocess.Popen([sys.executable, os.path.abspath(__file__), "report", "--refresh"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        return True
+    except OSError:
+        return False
+
+
+def cmd_live(args):
+    cfg = load_config()
+    target = live_target(cfg)
+    if not target:
+        log("live: PIXTAHA_LIVE_URL (https) and PIXTAHA_LIVE_KEY are not set, live updates are off")
+        return
+    try:
+        every = min(60, max(2, int(cfg.get("PIXTAHA_LIVE_INTERVAL") or LIVE_EVERY_S)))
+    except ValueError:
+        every = LIVE_EVERY_S
+    log("live: every %d s to %s" % (every, target[0]))
+    prev = cpu_counters()
+    time.sleep(1)
+    conts, conts_at, fails, last_note, last_save, n = None, 0.0, 0, 0.0, 0.0, 0
+    while True:
+        t0 = time.time()
+        cnt = cpu_counters()
+        cpu, prev = cpu_pct_between(prev, cnt), cnt
+        if t0 - conts_at >= LIVE_CONTAINERS_EVERY_S:
+            conts, conts_at = live_containers(), t0
+        code, res = rpc_post(target, "sm_live", {"p_token": target[2], "p": live_snapshot(cfg, cpu, conts)})
+        ok = code is not None and 200 <= code < 300 and isinstance(res, dict) and res.get("ok")
+        if ok:
+            fails = 0
+            if res.get("recheck"):
+                log("live: re-check asked by the hub, starting a refresh report")
+                start_refresh()
+        else:
+            fails += 1
+            if t0 - last_note >= 300:
+                last_note = t0
+                reason = (res or {}).get("reason") if isinstance(res, dict) else None
+                log("live: push failed (HTTP %s%s), retrying" % (code, ", " + reason if reason else ""))
+        if t0 - last_save >= 60:
+            last_save = t0
+            save_json(LIVE_FILE, {"at": iso(t0), "http": code, "ok": bool(ok), "every": every})
+        n += 1
+        if args.once:
+            return
+        wait = every if fails == 0 else min(60, every * (2 ** min(fails, 4)))
+        time.sleep(max(0.5, wait - (time.time() - t0)))
+
+
+def send_refresh(cfg, args):
+    target = live_target(cfg)
+    if not target and not (args.dry_run or args.out):
+        log("refresh: PIXTAHA_LIVE_URL and PIXTAHA_LIVE_KEY are not set, nothing to send")
+        return
+    payload, _old, _new = build_report(cfg)  # read-only: refresh reports never move the daily baseline
+    now = now_utc()
+    payload["report"]["type"] = "refresh"
+    payload["report"]["id"] = "%s-refresh-%s" % (payload["server"]["hostname"], now.strftime("%Y%m%d%H%M%S"))
+    if args.dry_run or args.out:
+        return payload
+    code, res = rpc_post(target, "sm_push_report", {"p_token": target[2], "p": payload}, timeout=60, limit_kb=2048)
+    log("refresh %s: HTTP %s, status %s, %d attention items%s" % (
+        payload["report"]["id"], code, payload["status"]["overall"], len(payload["attention"]),
+        "" if code and 200 <= code < 300 else " (not stored)"))
+    if not (code and 200 <= code < 300):
+        sys.exit(1)
+    return None
+
+
 # --------------------------------------------------------------------------- CLI
 
 def cmd_sample(_args):
@@ -1792,8 +1995,14 @@ def cmd_sample(_args):
 
 def cmd_report(args):
     cfg = load_config()
-    with StateLock():
-        payload, _old, new_state = build_report(cfg)
+    if args.refresh:
+        payload = send_refresh(cfg, args)
+        if payload is None:
+            return
+        new_state = None
+    else:
+        with StateLock():
+            payload, _old, new_state = build_report(cfg)
     if args.id_suffix:
         payload["report"]["id"] += "-" + re.sub(r"[^a-z0-9-]", "", args.id_suffix.lower())
     if args.dry_run or args.out:
@@ -1837,6 +2046,10 @@ def cmd_status(_args):
     lp = al.get("last_post")
     print("heartbeat:    " + ("%s, HTTP %s" % (lp["at"], lp["http"]) if lp else "never sent"))
     print("open alerts:  " + (", ".join(sorted(al.get("sent", {}))) or "none"))
+    lt = live_target(cfg)
+    lv = load_json(LIVE_FILE, None)
+    print("live url:     " + (lt[0] if lt else "(not set, live dashboard off)"))
+    print("live push:    " + ("%s, HTTP %s, %s" % (lv["at"], lv["http"], "ok" if lv.get("ok") else "FAILING") if lv else "never"))
 
 
 def main():
@@ -1848,6 +2061,9 @@ def main():
     rp.add_argument("--dry-run", action="store_true", help="print the payload, do not send, do not update state")
     rp.add_argument("--out", help="write the payload to a file instead of sending")
     rp.add_argument("--id-suffix", help="append to report.id (for a manual extra report on the same day)")
+    rp.add_argument("--refresh", action="store_true", help="full checks for the live dashboard: no email, no state change")
+    lp = sub.add_parser("live", help="push a live snapshot every 5 seconds (runs as a service)")
+    lp.add_argument("--once", action="store_true", help="push one snapshot and exit")
     sub.add_parser("status", help="show config (without the token) and last runs")
     args = ap.parse_args()
     os.umask(0o077)
@@ -1855,6 +2071,8 @@ def main():
         cmd_sample(args)
     elif args.cmd == "report":
         cmd_report(args)
+    elif args.cmd == "live":
+        cmd_live(args)
     elif args.cmd == "status":
         cmd_status(args)
     else:

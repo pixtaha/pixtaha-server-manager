@@ -20,7 +20,7 @@ Contract between the collector on each server, the n8n workflow "Server Manager"
 | Key | Required | Purpose |
 |---|---|---|
 | `schema_version` | yes | `"1.0"` |
-| `report` | yes | id, type, period, collector version |
+| `report` | yes | id, type (`daily`, or `refresh` for the 5-minute dashboard refresh, collector 1.2.0+), period, collector version |
 | `server` | yes | hostname, client, env, hardware, OS |
 | `status` | yes | overall status + counts by severity |
 | `kpis` | yes | the 4 email KPI tiles (uptime from `server.uptime_seconds`) |
@@ -83,3 +83,9 @@ A full example payload with real server data is kept in the private Claude Proje
 
 ## Real-time alerts (collector 1.1.0+)
 Separate from the daily report: every 5-minute sample posts a heartbeat to `POST https://<n8n-host>/webhook/server-alert` (same `X-Report-Token`), body `{schema_version:"1.0", hostname, client, env, at, collector, heartbeat:true, alerts:[{key,severity,title,detail}], resolved:[{key,title}]}`. Details in `collector/README.md` and `docs/n8n/README.md`.
+
+## Live dashboard (collector 1.2.0+)
+- **Refresh report**: the same payload with `report.type = "refresh"` and `report.id = <hostname>-refresh-<UTC yyyymmddHHMMSS>`, built every 5 minutes and when the hub asks for a re-check. Sent straight to `public.sm_push_report(p_token, p)` on the Supabase REST API, never emailed; only the newest one per server is kept. It never moves the daily baseline (changes, known login IPs, growth).
+- **Live snapshot**: every 5 seconds to `public.sm_live(p_token, p)`: `{hostname, collector, cpu, ram, ram_mb, ram_total_mb, swap_mb, disk, disk_gb, disk_total_gb, load1, cores, boot_at, running, total, containers:[{n, s}]}`. Names and numbers only. The reply `{ok, recheck}` tells the collector to start a refresh report.
+- Both calls use the Supabase anon key as `apikey` and the report token as `p_token`; the database stores only the token's sha256.
+- `blocks.security.public_ports[].restricted_to`: number of allowed sources when the DOCKER-USER chain drops every other source. Such database ports are not flagged.

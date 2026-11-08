@@ -1,6 +1,6 @@
 import "server-only";
 import { CHECKS, checkFor } from "./checks";
-import type { AlertItem, AlertsSnapshot, Env, FleetSnapshot, ReportListItem, ServerDetail, ServerSummary, Severity, Status } from "./types";
+import type { AlertItem, AlertsSnapshot, Env, FleetSnapshot, LiveSnapshot, LiveState, ReportListItem, ServerDetail, ServerSummary, Severity, Status } from "./types";
 
 /**
  * Live data from the self-hosted Supabase (schema server_manager), read server-side through the
@@ -11,6 +11,8 @@ import type { AlertItem, AlertsSnapshot, Env, FleetSnapshot, ReportListItem, Ser
 const OFFLINE_AFTER_MS = 26 * 3600 * 1000;
 /** Collector 1.1.0+ sends a heartbeat every 5 minutes: silent for this long = offline. */
 const HEARTBEAT_OFFLINE_MS = 15 * 60 * 1000;
+/** Collector 1.2.0+ pushes a live snapshot every 5 seconds: newer than this = live numbers. */
+export const LIVE_FRESH_MS = 2 * 60 * 1000;
 
 interface FleetRow {
   hostname: string;
@@ -20,6 +22,9 @@ interface FleetRow {
   last_status: Severity | null;
   /** Null until the server runs collector 1.1.0+ (migration 0006). */
   last_heartbeat_at?: string | null;
+  /** Null until the server runs collector 1.2.0+ with the live channel (migration 0007). */
+  live?: LiveSnapshot | null;
+  live_at?: string | null;
   open_issues: number;
   payload: Payload | null;
 }
@@ -65,8 +70,14 @@ function toStatus(sev: Severity | null | undefined): Status {
   return "healthy";
 }
 
+function liveFresh(row: { live?: LiveSnapshot | null; live_at?: string | null }, now: number): boolean {
+  return Boolean(row.live && row.live_at && now - Date.parse(row.live_at) <= LIVE_FRESH_MS);
+}
+
 function hubStatus(row: FleetRow, now: number): Status {
-  if (row.last_heartbeat_at) {
+  if (liveFresh(row, now)) {
+    // online for sure; health comes from the newest report
+  } else if (row.last_heartbeat_at) {
     if (now - Date.parse(row.last_heartbeat_at) > HEARTBEAT_OFFLINE_MS) return "offline";
   } else if (!row.last_report_at || now - Date.parse(row.last_report_at) > OFFLINE_AFTER_MS) return "offline";
   if (!row.payload && !row.last_status) return "offline";
@@ -79,6 +90,7 @@ function lastSeen(row: FleetRow): string | null {
 }
 
 function offlineNote(row: FleetRow): string {
+  if (row.live_at) return "No live data or heartbeat for over 15 minutes";
   if (row.last_heartbeat_at) return "No heartbeat for over 15 minutes";
   return row.last_report_at ? "No report in the last 26 hours" : "Waiting for the first report";
 }
@@ -143,21 +155,25 @@ function summarize(row: FleetRow, now: number): ServerSummary {
         ? (CHECKS[attentionId(top)]?.name ?? String(top.title ?? attentionId(top)))
         : "All checks passed";
   const count = (sev: string) => att.filter((a) => a.severity === sev).length;
+  const lv = liveFresh(row, now) ? row.live! : null;
+  const round = (v: number | null | undefined) => (v == null ? null : Math.round(v));
   return {
     hostname: row.hostname,
     client: row.client,
     env: row.env,
     status,
     note,
-    cpuPct: p?.kpis?.cpu_avg_pct != null ? Math.round(p.kpis.cpu_avg_pct) : null,
-    ramPct: pct(p?.kpis?.ram_used_mb, p?.server?.ram_total_mb),
-    diskPct: p?.kpis?.disk_used_pct != null ? Math.round(p.kpis.disk_used_pct) : null,
+    cpuPct: lv ? round(lv.cpu) : p?.kpis?.cpu_avg_pct != null ? Math.round(p.kpis.cpu_avg_pct) : null,
+    ramPct: lv ? round(lv.ram) : pct(p?.kpis?.ram_used_mb, p?.server?.ram_total_mb),
+    diskPct: lv ? round(lv.disk) : p?.kpis?.disk_used_pct != null ? Math.round(p.kpis.disk_used_pct) : null,
     workloads: p ? workloads(p) : [],
     alertsCritical: count("critical"),
     alertsWarning: count("warning"),
-    containersUp: p?.blocks?.containers?.running ?? 0,
-    containersTotal: p?.blocks?.containers?.total ?? 0,
+    containersUp: lv?.running ?? p?.blocks?.containers?.running ?? 0,
+    containersTotal: lv?.total ?? p?.blocks?.containers?.total ?? 0,
     lastSeenAt: lastSeen(row) ?? new Date(0).toISOString(),
+    lastReportAt: row.last_report_at,
+    live: Boolean(lv),
   };
 }
 
@@ -168,7 +184,7 @@ export async function liveFleet(): Promise<FleetSnapshot> {
 }
 
 /** Payload v1 as stored -> the shape the Server detail view renders. */
-function toDetail(p: Payload, heartbeatAt: string, status: Status): ServerDetail {
+function toDetail(p: Payload, heartbeatAt: string, status: Status, live: LiveState | null = null): ServerDetail {
   const attention = ((p.attention ?? []) as unknown as Record<string, unknown>[]).map((a) => ({
     id: attentionId(a),
     severity: (a.severity as Severity) ?? "warning",
@@ -184,13 +200,32 @@ function toDetail(p: Payload, heartbeatAt: string, status: Status): ServerDetail
     blocks: normalizeBlocks(p.blocks ?? {}),
     server: { ...p.server, last_heartbeat_at: heartbeatAt },
     hub_status: status,
+    live,
   };
 }
 
 export async function liveServer(hostname: string): Promise<ServerDetail | null> {
-  const row = await rpc<ServerRow | null>("sm_server", { p_hostname: hostname });
+  const [row, live] = await Promise.all([
+    rpc<ServerRow | null>("sm_server", { p_hostname: hostname }),
+    liveNowServer(hostname).catch(() => null), // before migration 0007 the function does not exist
+  ]);
   if (!row || !row.payload) return null;
-  return toDetail(row.payload, lastSeen(row) ?? row.payload.report.generated_at, hubStatus(row, Date.now()));
+  return toDetail(row.payload, lastSeen(row) ?? row.payload.report.generated_at, hubStatus(row, Date.now()), live);
+}
+
+/** Live channel, polled by the browser every 5 seconds (small: no payloads). */
+export async function liveNowServer(hostname: string): Promise<LiveState | null> {
+  return rpc<LiveState | null>("sm_live_server", { p_hostname: hostname });
+}
+
+export async function liveNowFleet(): Promise<LiveState[]> {
+  return rpc<LiveState[]>("sm_live_fleet");
+}
+
+/** Hub "Re-check now": the collector picks it up with its next live push and sends a refresh report. */
+export async function liveRecheck(hostname: string): Promise<boolean> {
+  const r = await rpc<{ requested_at: string } | null>("sm_recheck", { p_hostname: hostname });
+  return Boolean(r && r.requested_at);
 }
 
 export async function liveReports(limit = 300): Promise<ReportListItem[]> {

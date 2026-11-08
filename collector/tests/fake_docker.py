@@ -10,6 +10,9 @@ with open(os.path.join(D, "inspect.json")) as f:
 a = sys.argv[1:]
 if a[:1] == ["info"]:
     print("29.7.2")
+elif a[:1] == ["ps"] and "--format" in a:
+    for c in CONTAINERS:
+        print("%s\t%s" % (c["Name"].lstrip("/"), c["State"]["Status"]))
 elif a[:1] == ["ps"]:
     print("\n".join(c["Id"] for c in CONTAINERS))
 elif a[:1] == ["inspect"]:

@@ -31,6 +31,7 @@ Owner: Taha (Pixtaha). Talk to him in Egyptian Arabic; everything in the repo is
 4. Add server: name, client, env, one-line install command, waiting-for-heartbeat state.
 5. Login — done: passkey first, fallback password + TOTP, backup codes, rate limits (hub-owned accounts, `supabase/migrations/0004_hub_auth.sql`).
 6. Data — done: schema `server_manager` (migrations in `supabase/`), n8n stores every report, hub reads via service-role RPCs.
+7. Live — done: collector 1.2.0 pushes a live snapshot every 5 s and a refresh report every 5 min straight to Supabase (`0007_live.sql`); pages poll `/api/live` every 5 s; "Re-check now".
 
 ## Checks before every push
 - `cd hub && npx tsc --noEmit && npx next build`

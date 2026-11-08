@@ -34,5 +34,6 @@ assert len(p["kpis"]["cpu_hourly_pct"]) == 24
 print("payload ok:", p["status"]["overall"], len(p["attention"]), "attention items")
 EOF
 python3 "$HERE/test_alerts.py"
+python3 "$HERE/test_live.py"
 node "$REPO/email/render.js" "$FX/payload.json" "$FX/email.html" light
 echo "all collector tests passed"
