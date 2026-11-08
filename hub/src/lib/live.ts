@@ -26,6 +26,8 @@ interface FleetRow {
   live?: LiveSnapshot | null;
   live_at?: string | null;
   open_issues: number;
+  /** Keys of accepted issues (migration 0008). */
+  accepted?: string[];
   payload: Payload | null;
 }
 
@@ -38,6 +40,9 @@ interface IssueRow {
   last_seen_at: string;
   resolved_at: string | null;
   acknowledged_at: string | null;
+  accepted_at?: string | null;
+  accepted_note?: string | null;
+  accepted_by?: string | null;
 }
 
 interface ServerRow extends FleetRow {
@@ -74,6 +79,25 @@ function liveFresh(row: { live?: LiveSnapshot | null; live_at?: string | null },
   return Boolean(row.live && row.live_at && now - Date.parse(row.live_at) <= LIVE_FRESH_MS);
 }
 
+/** Issue key, same as server_manager.ingest_report: the attention `key`, else id|title. */
+export function issueKey(a: Record<string, unknown>): string {
+  if (a.key) return String(a.key);
+  return `${String(a.id ?? a.check ?? "unknown")}|${String(a.title ?? "")}`;
+}
+
+const SEV_RANK: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+
+/** Worst severity of the attention items Taha has not accepted ("healthy" when none). */
+function openSeverity(att: Record<string, unknown>[], accepted: Set<string>): Severity {
+  let worst: Severity = "healthy";
+  for (const a of att) {
+    if (accepted.has(issueKey(a))) continue;
+    const sev = String(a.severity ?? "warning");
+    if (sev in SEV_RANK && (worst === "healthy" || SEV_RANK[sev] < SEV_RANK[worst])) worst = sev as Severity;
+  }
+  return worst === "info" ? "healthy" : worst;
+}
+
 function hubStatus(row: FleetRow, now: number): Status {
   if (liveFresh(row, now)) {
     // online for sure; health comes from the newest report
@@ -81,7 +105,11 @@ function hubStatus(row: FleetRow, now: number): Status {
     if (now - Date.parse(row.last_heartbeat_at) > HEARTBEAT_OFFLINE_MS) return "offline";
   } else if (!row.last_report_at || now - Date.parse(row.last_report_at) > OFFLINE_AFTER_MS) return "offline";
   if (!row.payload && !row.last_status) return "offline";
-  return toStatus(row.payload?.status?.overall ?? row.last_status);
+  if (row.payload) {
+    const att = (row.payload.attention ?? []) as unknown as Record<string, unknown>[];
+    return toStatus(openSeverity(att, new Set(row.accepted ?? [])));
+  }
+  return toStatus(row.last_status);
 }
 
 /** Newest sign of life: heartbeat (1.1.0+) or the daily report. */
@@ -146,7 +174,8 @@ function attentionId(a: Record<string, unknown>): string {
 function summarize(row: FleetRow, now: number): ServerSummary {
   const p = row.payload;
   const status = hubStatus(row, now);
-  const att = (p?.attention ?? []) as unknown as Record<string, unknown>[];
+  const accepted = new Set(row.accepted ?? []);
+  const att = ((p?.attention ?? []) as unknown as Record<string, unknown>[]).filter((a) => !accepted.has(issueKey(a)));
   const top = att[0];
   const note =
     status === "offline"
@@ -184,14 +213,20 @@ export async function liveFleet(): Promise<FleetSnapshot> {
 }
 
 /** Payload v1 as stored -> the shape the Server detail view renders. */
-function toDetail(p: Payload, heartbeatAt: string, status: Status, live: LiveState | null = null): ServerDetail {
-  const attention = ((p.attention ?? []) as unknown as Record<string, unknown>[]).map((a) => ({
-    id: attentionId(a),
-    severity: (a.severity as Severity) ?? "warning",
-    title: String(a.title ?? ""),
-    impact: String(a.impact ?? ""),
-    action: String(a.action ?? ""),
-  }));
+function toDetail(p: Payload, heartbeatAt: string, status: Status, live: LiveState | null = null, accepted: Map<string, IssueRow> = new Map()): ServerDetail {
+  const attention = ((p.attention ?? []) as unknown as Record<string, unknown>[]).map((a) => {
+    const key = issueKey(a);
+    const acc = accepted.get(key);
+    return {
+      id: attentionId(a),
+      severity: (a.severity as Severity) ?? "warning",
+      title: String(a.title ?? ""),
+      impact: String(a.impact ?? ""),
+      action: String(a.action ?? ""),
+      key,
+      accepted: acc?.accepted_at ? { at: acc.accepted_at, note: acc.accepted_note ?? null, by: acc.accepted_by ?? null } : null,
+    };
+  });
   return {
     ...p,
     kpis: normalizeKpis(p.kpis),
@@ -210,7 +245,15 @@ export async function liveServer(hostname: string): Promise<ServerDetail | null>
     liveNowServer(hostname).catch(() => null), // before migration 0007 the function does not exist
   ]);
   if (!row || !row.payload) return null;
-  return toDetail(row.payload, lastSeen(row) ?? row.payload.report.generated_at, hubStatus(row, Date.now()), live);
+  const accepted = new Map(row.issues.filter((i) => i.accepted_at).map((i) => [i.key, i] as const));
+  const withAccepted = { ...row, accepted: [...accepted.keys()] };
+  return toDetail(row.payload, lastSeen(row) ?? row.payload.report.generated_at, hubStatus(withAccepted, Date.now()), live, accepted);
+}
+
+/** Hub "Accept" / "Undo": an accepted issue stays listed but no longer sets the server status. */
+export async function liveAccept(hostname: string, key: string, accept: boolean, note: string | null, by: string | null): Promise<boolean> {
+  const r = await rpc<{ key: string } | null>("sm_issue_accept", { p_hostname: hostname, p_key: key, p_accept: accept, p_note: note, p_by: by });
+  return Boolean(r && r.key);
 }
 
 /** Live channel, polled by the browser every 5 seconds (small: no payloads). */
@@ -277,8 +320,8 @@ export async function liveAlerts(): Promise<AlertsSnapshot> {
         first_seen_at: i.first_seen_at,
         last_seen_at: i.last_seen_at,
         occurrences: Math.max(1, days + 1),
-        state: i.resolved_at ? "resolved" : i.acknowledged_at ? "acknowledged" : "open",
-        ...(i.acknowledged_at ? { acknowledged_at: i.acknowledged_at } : {}),
+        state: i.resolved_at ? "resolved" : i.acknowledged_at || i.accepted_at ? "acknowledged" : "open",
+        ...(i.acknowledged_at || i.accepted_at ? { acknowledged_at: (i.acknowledged_at ?? i.accepted_at)! } : {}),
         ...(i.resolved_at ? { resolved_at: i.resolved_at } : {}),
       });
     }

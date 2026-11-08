@@ -142,6 +142,18 @@ stopped = {"Name": "/n8n-b", "State": {"Status": "exited"}, "Config": {"Labels":
 doms = pc.domains_from_configs([running, stopped])
 assert "a.example.com" in doms and "b.example.com" not in doms, doms
 
+# 4c. a new IP that logs in with an authorized key is not an unknown login; a password login is
+log = os.path.join(bk, "auth.log")
+stamp = _dt.datetime.now().strftime("%b %e %H:%M:%S")
+with open(log, "w") as f:
+    f.write("%s demo sshd[1]: Accepted publickey for root from 203.0.113.5 port 5 ssh2: ED25519 SHA256:OwnerKey123\n" % stamp)
+    f.write("%s demo sshd[2]: Accepted password for root from 198.51.100.9 port 6 ssh2\n" % stamp)
+    f.write("%s demo sshd[3]: Accepted publickey for root from 192.0.2.77 port 7 ssh2: ED25519 SHA256:OtherKey999\n" % stamp)
+since = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(hours=1)
+failed, methods, ips, key_ips = pc.scan_auth({"PIXTAHA_AUTH_LOG": log}, since, trusted_fps={"SHA256:OwnerKey123"})
+assert ips == {"203.0.113.5", "198.51.100.9", "192.0.2.77"}, ips
+assert key_ips == {"203.0.113.5"}, key_ips
+
 # 5. without live config the live command exits cleanly (the service stays stopped)
 with open(env["PIXTAHA_CONFIG"], "w") as f:
     f.write("PIXTAHA_CLIENT=Demo Client\nPIXTAHA_ENV=demo\nPIXTAHA_REPORT_TOKEN=%s\n" % TOKEN)

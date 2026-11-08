@@ -38,7 +38,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 SCHEMA = "1.0"
 
 CONFIG_FILE = os.environ.get("PIXTAHA_CONFIG", "/etc/pixtaha-collector/config.env")
@@ -1085,13 +1085,26 @@ def auth_line_time(line, ref):
     return None
 
 
-def scan_auth(cfg, since):
+def authorized_fingerprints():
+    """SHA256 fingerprints of every key in root's and users' authorized_keys (names only, no key material kept)."""
+    fps = set()
+    for f in glob.glob("/root/.ssh/authorized_keys*") + glob.glob("/home/*/.ssh/authorized_keys*"):
+        out = run(["ssh-keygen", "-lf", f], timeout=10) or ""
+        fps.update(re.findall(r"SHA256:[A-Za-z0-9+/]+", out))
+    return fps
+
+
+def scan_auth(cfg, since, trusted_fps=None):
+    """Failed logins, accepted methods, accepted IPs, and the IPs whose every accepted login used a key that is
+    in authorized_keys (a changing home IP with the owner's key is not an unknown login)."""
     paths = [cfg["PIXTAHA_AUTH_LOG"]] if cfg.get("PIXTAHA_AUTH_LOG") else AUTH_LOGS
     path = next((p for p in paths if os.path.exists(p)), None)
     failed, accepted, method = 0, {}, {}
     ips = set()
+    by_key = {}
     if path is None:
-        return None, {}, set()
+        return None, {}, set(), set()
+    trusted_fps = authorized_fingerprints() if trusted_fps is None else trusted_fps
     ref = now_utc()
     for p in (path + ".1", path):
         if not os.path.exists(p):
@@ -1116,9 +1129,13 @@ def scan_auth(cfg, since):
                 else:
                     m = re.search(r"Accepted (\S+) for (\S+) from (\S+)", line)
                     if m:
-                        ips.add(m.group(3))
+                        ip = m.group(3)
+                        ips.add(ip)
                         method[m.group(1)] = method.get(m.group(1), 0) + 1
-    return failed, method, ips
+                        fp = re.search(r"SHA256:[A-Za-z0-9+/]+", line)
+                        ok = m.group(1) == "publickey" and fp is not None and fp.group(0) in trusted_fps
+                        by_key[ip] = by_key.get(ip, True) and ok
+    return failed, method, ips, {ip for ip, ok in by_key.items() if ok}
 
 
 def sshd_settings():
@@ -1527,9 +1544,9 @@ def build_report(cfg, end=None):
                     public_ports[p["port"]]["restricted_to"] = len(restricted[p["port"]])
 
     pw, root_login = sshd_settings()
-    failed, methods, login_ips = scan_auth(cfg, start)
+    failed, methods, login_ips, key_ips = scan_auth(cfg, start)
     known = set(state.get("known_login_ips", []))
-    unknown = sorted(login_ips - known) if known else []
+    unknown = sorted(login_ips - known - key_ips) if known else []
     fw = firewall_active()
     upd_total, upd_sec = pending_updates()
     sec = {
