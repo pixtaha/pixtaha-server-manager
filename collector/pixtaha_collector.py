@@ -38,7 +38,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-VERSION = "1.2.2"
+VERSION = "1.2.3"
 SCHEMA = "1.0"
 
 CONFIG_FILE = os.environ.get("PIXTAHA_CONFIG", "/etc/pixtaha-collector/config.env")
@@ -1385,8 +1385,8 @@ def build_attention(kpis, mem, disk, cont_items, cont_block, n8n_insts, dbs, dom
             "%s can use all RAM and starve the server." % names(nl), "Set mem_limit on each.")
 
     # ports
-    dbp = sorted({p["port"] for p in sec["public_ports"] if p["is_database"] and not p.get("restricted_to")})
-    # ports limited by DOCKER-USER to known sources carry restricted_to and are not flagged
+    # ports limited by DOCKER-USER carry restricted_to (number of allowed sources, 0 = closed) and are not flagged
+    dbp = sorted({p["port"] for p in sec["public_ports"] if p["is_database"] and "restricted_to" not in p})
     if dbp:
         add("ports.public_database", "critical" if not fw_active else "warning",
             "Database port%s %s open on all interfaces" % ("s" if len(dbp) > 1 else "", " and ".join(map(str, dbp))),
