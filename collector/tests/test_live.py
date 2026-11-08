@@ -129,6 +129,19 @@ dirs = pc.backup_dirs(cfg)
 assert os.path.realpath(os.path.join(bk, "new-backups")) in dirs
 assert os.path.realpath(os.path.join(bk, "old-backups")) not in dirs
 
+# 4b. backups of generically named containers (exact file-name prefix) and domains of stopped containers
+import datetime as _dt
+t1 = _dt.datetime(2026, 11, 8, 3, 30, tzinfo=_dt.timezone.utc)
+files = [("/root/pixtaha-backups/2026-11-08/postgres-all.sql.gz", t1, 10),
+         ("/root/pixtaha-backups/2026-11-08/postgresql-other.sql.gz", t1 + _dt.timedelta(hours=1), 10),
+         ("/root/pixtaha-backups/2026-11-08/supabase-db.sql.gz", t1, 10)]
+assert pc.newest_exact(files, "postgres") == t1, "exact container-name prefix not matched"
+assert pc.newest_exact(files, "redis") is None
+running = {"Name": "/n8n-a", "State": {"Status": "running"}, "Config": {"Labels": {"traefik.http.routers.a.rule": "Host(`a.example.com`)"}}}
+stopped = {"Name": "/n8n-b", "State": {"Status": "exited"}, "Config": {"Labels": {"traefik.http.routers.b.rule": "Host(`b.example.com`)"}}}
+doms = pc.domains_from_configs([running, stopped])
+assert "a.example.com" in doms and "b.example.com" not in doms, doms
+
 # 5. without live config the live command exits cleanly (the service stays stopped)
 with open(env["PIXTAHA_CONFIG"], "w") as f:
     f.write("PIXTAHA_CLIENT=Demo Client\nPIXTAHA_ENV=demo\nPIXTAHA_REPORT_TOKEN=%s\n" % TOKEN)
