@@ -142,6 +142,10 @@ export interface AttentionItem {
   title: string;
   impact: string;
   action: string;
+  /** Hub addition: issue key (stable attention `key`, or id|title for older payloads). */
+  key?: string;
+  /** Hub addition: Taha accepted this risk; it no longer sets the server status. */
+  accepted?: { at: string; note: string | null; by: string | null } | null;
 }
 
 export type ChangeType = "container_added" | "container_removed" | "image_changed" | "port_opened" | "port_closed" | "config_changed" | "reboot";

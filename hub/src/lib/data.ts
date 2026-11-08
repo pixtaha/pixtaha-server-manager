@@ -1,6 +1,6 @@
 import "server-only";
 import { connection } from "next/server";
-import { liveAlerts, liveConfigured, liveFleet, liveNowFleet, liveNowServer, liveRecheck, liveReport, liveReports, liveServer } from "./live";
+import { liveAccept, liveAlerts, liveConfigured, liveFleet, liveNowFleet, liveNowServer, liveRecheck, liveReport, liveReports, liveServer } from "./live";
 import { SAMPLE_ALERTS, SAMPLE_DETAILS, SAMPLE_FLEET } from "./sample-data";
 import type { AlertsSnapshot, FleetSnapshot, LiveState, ReportListItem, ServerDetail } from "./types";
 
@@ -29,6 +29,11 @@ export async function getLive(hostname?: string): Promise<LiveState | LiveState[
 export async function requestRecheck(hostname: string): Promise<boolean> {
   if (!liveConfigured()) return false;
   return liveRecheck(hostname);
+}
+
+export async function setAccepted(hostname: string, key: string, accept: boolean, note: string | null, by: string | null): Promise<boolean> {
+  if (!liveConfigured()) return false;
+  return liveAccept(hostname, key, accept, note, by);
 }
 
 /** All alerts (open, acknowledged, resolved). Grouping of duplicates happens in the UI. */

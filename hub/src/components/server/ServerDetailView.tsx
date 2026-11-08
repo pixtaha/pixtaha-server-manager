@@ -2,8 +2,9 @@ import { AlertTriangle, Globe, Mail } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { StatusIcon, StatusPill, sevStatus } from "@/components/StatusPill";
-import { ago, cairoStamp, cairoTime, cairoWhen, dur, mb, ms, num } from "@/lib/format";
+import { ago, cairoDay, cairoStamp, cairoTime, cairoWhen, dur, mb, ms, num } from "@/lib/format";
 import type { AttentionItem, ChangeItem, ContainerItem, DomainItem, N8nInstance, ServerDetail, Severity, Status } from "@/lib/types";
+import { AcceptButton } from "./AcceptButton";
 import { LiveCharts, LiveHeartbeat, LiveKpis, LiveProvider, RecheckButton } from "./LiveDetail";
 
 /*
@@ -92,7 +93,11 @@ export function ServerDetailView({ d, now, asReport }: { d: ServerDetail; now: s
   const status = d.hub_status;
   const ref = report.generated_at;
   const offline = status === "offline";
-  const attention = [...d.attention].sort((a, z) => RANK[a.severity] - RANK[z.severity]);
+  // open items first (most severe first), accepted ones at the end
+  const attention = [...d.attention].sort((a, z) => Number(Boolean(a.accepted)) - Number(Boolean(z.accepted)) || RANK[a.severity] - RANK[z.severity]);
+  const openCount = attention.filter((a) => !a.accepted).length;
+  const acceptedCount = attention.length - openCount;
+  const canAccept = !asReport && !d.sample && Boolean(d.live !== undefined);
   const specs = `${s.cores} cores · ${gb(s.ram_total_mb)} RAM · ${s.os}`;
 
   const page = (
@@ -148,10 +153,19 @@ export function ServerDetailView({ d, now, asReport }: { d: ServerDetail; now: s
 
       <div className="detail-grid">
         <div className="detail-main">
-          <Section title="Needs attention" id="sec-attention" meta={attention.length ? `${attention.length} open · most severe first` : "None open"}>
+          <Section
+            title="Needs attention"
+            id="sec-attention"
+            meta={attention.length ? `${openCount} open${acceptedCount ? ` · ${acceptedCount} accepted` : ""} · most severe first` : "None open"}
+          >
+            {openCount === 0 && acceptedCount ? (
+              <div className="panel-body">
+                <StatusText status="healthy">Nothing open. The items below are accepted risks.</StatusText>
+              </div>
+            ) : null}
             {attention.length ? (
               <ol className="attn">
-                {attention.map((a, i) => <Attention key={a.id + a.title} a={a} n={i + 1} />)}
+                {attention.map((a, i) => <Attention key={a.id + a.title} a={a} n={i + 1} host={canAccept ? s.hostname : null} />)}
               </ol>
             ) : (
               <div className="panel-body">
@@ -197,16 +211,26 @@ export function ServerDetailView({ d, now, asReport }: { d: ServerDetail; now: s
 /* needs attention                                                     */
 /* ------------------------------------------------------------------ */
 
-function Attention({ a, n }: { a: AttentionItem; n: number }) {
+function Attention({ a, n, host }: { a: AttentionItem; n: number; host: string | null }) {
   return (
-    <li className="attn-item">
+    <li className={`attn-item${a.accepted ? " attn-item--accepted" : ""}`}>
       <span className="attn-n mono" aria-hidden>{String(n).padStart(2, "0")}</span>
       <span className="attn-title">{a.title}</span>
-      <StatusPill status={sevStatus(a.severity)} size="sm" />
+      {a.accepted ? <span className="pill pill--plain pill--sm attn-accepted-pill"><StatusIcon status="healthy" size={12} /> Accepted</span> : <StatusPill status={sevStatus(a.severity)} size="sm" />}
       {a.impact ? <span className="attn-text muted">{a.impact}</span> : null}
-      {a.action ? (
+      {a.action && !a.accepted ? (
         <span className="attn-text">
           <span className="subtle">Do:</span> {a.action}
+        </span>
+      ) : null}
+      {a.accepted ? (
+        <span className="attn-text subtle">
+          Accepted {cairoDay(a.accepted.at)}{a.accepted.note ? ` · ${a.accepted.note}` : ""}
+        </span>
+      ) : null}
+      {host && a.key ? (
+        <span className="attn-text attn-actions">
+          <AcceptButton host={host} issueKey={a.key} accepted={Boolean(a.accepted)} />
         </span>
       ) : null}
     </li>
