@@ -210,6 +210,7 @@ cat > "$UNIT_DIR/pixtaha-collector-refresh.timer" <<EOF
 Description=Pixtaha collector: refresh report 5 minutes after the previous one
 
 [Timer]
+OnActiveSec=1min
 OnBootSec=3min
 OnUnitInactiveSec=5min
 AccuracySec=30s
