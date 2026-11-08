@@ -120,6 +120,13 @@ assert res[6543] == ["198.51.100.7/32"], res
 assert 3306 not in res, "dropping one source does not restrict a port"
 assert 27017 in res and 9200 in res and 9201 in res, res
 assert pc.docker_user_restrictions("") == {}
+closed = pc.docker_user_restrictions("-A DOCKER-USER -i eth0 -p tcp -m tcp --dport 6543 -j DROP")
+assert closed == {6543: []}, closed
+sec = {"public_ports": [{"port": 6543, "is_database": True, "restricted_to": 0}], "ssh_password_auth": False,
+       "ssh_root_login": "no", "failed_logins_24h": 0, "tmp_executables": 0, "unknown_login_ips": []}
+att = pc.build_attention({}, {"total_mb": 1, "used_mb": 0, "swap_used_mb": 0, "swap_total_mb": 0},
+                         {"used_pct": 1, "used_gb": 1, "total_gb": 10}, [], None, [], [], [], sec, [{"name": "/b", "status": "healthy"}], [], [], True)
+assert not [a for a in att if a["id"] == "ports.public_database"], "a closed database port (0 allowed sources) is still flagged"
 
 bk = tempfile.mkdtemp()
 os.makedirs(os.path.join(bk, "old-backups"))
