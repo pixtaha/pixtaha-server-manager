@@ -5,9 +5,12 @@
 set -euo pipefail
 [ "$(id -u)" -eq 0 ] || { echo "error: run as root" >&2; exit 1; }
 
-systemctl disable --now pixtaha-collector-sample.timer pixtaha-collector-report.timer 2>/dev/null || true
+systemctl disable --now pixtaha-collector-sample.timer pixtaha-collector-report.timer \
+  pixtaha-collector-refresh.timer pixtaha-collector-live.service 2>/dev/null || true
 rm -f /etc/systemd/system/pixtaha-collector-sample.service /etc/systemd/system/pixtaha-collector-sample.timer \
-      /etc/systemd/system/pixtaha-collector-report.service /etc/systemd/system/pixtaha-collector-report.timer
+      /etc/systemd/system/pixtaha-collector-report.service /etc/systemd/system/pixtaha-collector-report.timer \
+      /etc/systemd/system/pixtaha-collector-refresh.service /etc/systemd/system/pixtaha-collector-refresh.timer \
+      /etc/systemd/system/pixtaha-collector-live.service
 systemctl daemon-reload
 rm -f /usr/local/bin/pixtaha-collector
 rm -f /opt/pixtaha-collector/pixtaha_collector.py /opt/pixtaha-collector/REF /opt/pixtaha-collector/uninstall.sh
@@ -18,6 +21,7 @@ if [ "${1:-}" = "--purge" ]; then
   rmdir /etc/pixtaha-collector 2>/dev/null || true
   rm -f /var/lib/pixtaha-collector/samples.jsonl /var/lib/pixtaha-collector/state.json \
         /var/lib/pixtaha-collector/last_report.json /var/lib/pixtaha-collector/last_cpu.json \
+        /var/lib/pixtaha-collector/alerts.json /var/lib/pixtaha-collector/live.json \
         /var/lib/pixtaha-collector/.lock
   rm -rf /var/lib/pixtaha-collector/docker
   rmdir /var/lib/pixtaha-collector 2>/dev/null || true

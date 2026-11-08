@@ -28,6 +28,47 @@ export interface ServerSummary {
   containersTotal: number;
   /** ISO timestamp of the last report or heartbeat. */
   lastSeenAt: string;
+  /** Newest stored report (daily or refresh); the live poll refreshes the page when it changes. */
+  lastReportAt?: string | null;
+  /** True when the numbers come from the live channel (collector 1.2.0+), not the last report. */
+  live?: boolean;
+}
+
+/** Live snapshot pushed every 5 seconds by collector 1.2.0+ (public.sm_live). */
+export interface LiveSnapshot {
+  collector?: string;
+  cpu?: number | null;
+  ram?: number | null;
+  ram_mb?: number | null;
+  ram_total_mb?: number | null;
+  swap_mb?: number | null;
+  disk?: number | null;
+  disk_gb?: number | null;
+  disk_total_gb?: number | null;
+  load1?: number | null;
+  cores?: number | null;
+  boot_at?: string | null;
+  running?: number | null;
+  total?: number | null;
+  containers?: { n: string; s: string }[];
+}
+
+/** 5-minute bucket of the live channel, last 24 hours. */
+export interface LivePoint {
+  at: string;
+  cpu: number | null;
+  ram: number | null;
+  disk: number | null;
+}
+
+export interface LiveState {
+  hostname: string;
+  live: LiveSnapshot | null;
+  live_at: string | null;
+  last_heartbeat_at: string | null;
+  last_report_at: string | null;
+  recheck_requested_at: string | null;
+  points?: LivePoint[];
 }
 
 export interface FleetSnapshot {
@@ -65,7 +106,7 @@ export interface ServerInfo {
   kernel?: string;
   public_ip?: string | null;
   uptime_seconds: number;
-  /** Hub addition: last heartbeat (the daily report is one per day, heartbeats every 30 s). */
+  /** Hub addition: newest sign of life (live push every 5 s, heartbeat every 5 min). */
   last_heartbeat_at: string;
 }
 
@@ -268,6 +309,8 @@ export interface ServerDetail {
   blocks: DetailBlocks;
   /** Hub addition: fleet status (adds `offline` when heartbeats stop). */
   hub_status: Status;
+  /** Hub addition: live channel state at render time (collector 1.2.0+), polled again in the browser. */
+  live?: LiveState | null;
   sample?: boolean;
 }
 

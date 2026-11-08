@@ -2,9 +2,9 @@ import { AlertTriangle, Globe, Mail } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { StatusIcon, StatusPill, sevStatus } from "@/components/StatusPill";
-import { ago, cairoDay, cairoStamp, cairoTime, cairoWhen, dur, mb, ms, num, uptime } from "@/lib/format";
+import { ago, cairoStamp, cairoTime, cairoWhen, dur, mb, ms, num } from "@/lib/format";
 import type { AttentionItem, ChangeItem, ContainerItem, DomainItem, N8nInstance, ServerDetail, Severity, Status } from "@/lib/types";
-import { ResourceChart } from "./ResourceChart";
+import { LiveCharts, LiveHeartbeat, LiveKpis, LiveProvider, RecheckButton } from "./LiveDetail";
 
 /*
  * Server detail, ported from docs/design/dashboard-app.dc.html (pg.detail).
@@ -95,11 +95,7 @@ export function ServerDetailView({ d, now, asReport }: { d: ServerDetail; now: s
   const attention = [...d.attention].sort((a, z) => RANK[a.severity] - RANK[z.severity]);
   const specs = `${s.cores} cores · ${gb(s.ram_total_mb)} RAM · ${s.os}`;
 
-  const ramMeta = k.ram_used_mb == null ? "—" : `${(k.ram_used_mb / 1024).toFixed(1)} / ${gb(s.ram_total_mb)}`;
-  const diskNums = (k.disk_hourly_pct ?? []).filter((v): v is number => v != null);
-  const diskPerDay = diskNums.length > 1 ? ((diskNums[diskNums.length - 1] - diskNums[0]) / 100) * s.disk_total_gb : null;
-
-  return (
+  const page = (
     <div className="stack detail">
       <nav aria-label="Breadcrumb" className="crumbs">
         {asReport ? <Link href="/reports">Daily reports</Link> : <Link href="/">Fleet</Link>}
@@ -130,10 +126,8 @@ export function ServerDetailView({ d, now, asReport }: { d: ServerDetail; now: s
             </>
           ) : (
             <>
-              <span className="heartbeat" style={{ color: offline ? "var(--color-offline)" : undefined }}>
-                {offline ? <StatusIcon status="offline" size={12} /> : <span className="heartbeat-dot" aria-hidden />}
-                Last heartbeat {ago(s.last_heartbeat_at, now)} · agent v{report.collector_version}
-              </span>
+              <LiveHeartbeat lastHeartbeatAt={s.last_heartbeat_at} collector={report.collector_version} offline={offline} renderedAt={now} />
+              <RecheckButton host={s.hostname} />
               <Link href={`/reports?server=${encodeURIComponent(s.hostname)}`} className="px-btn px-btn--secondary">
                 <Mail size={18} strokeWidth={1.75} aria-hidden /> Reports
               </Link>
@@ -148,25 +142,9 @@ export function ServerDetailView({ d, now, asReport }: { d: ServerDetail; now: s
         </p>
       ) : null}
 
-      <Kpis d={d} />
+      <LiveKpis server={s} kpis={k} generatedAt={ref} />
 
-      <section aria-label="Resources, last 24 hours" className="charts">
-        <ResourceChart
-          title="CPU"
-          values={k.cpu_hourly_pct}
-          endIso={ref}
-          meta={k.cpu_avg_pct == null ? "No data" : `avg ${Math.round(k.cpu_avg_pct)}% · peak ${Math.round(k.cpu_peak_pct ?? 0)}%`}
-        />
-        {k.ram_hourly_pct ? <ResourceChart title="Memory" values={k.ram_hourly_pct} endIso={ref} meta={ramMeta} /> : null}
-        {k.disk_hourly_pct ? (
-          <ResourceChart
-            title="Disk"
-            values={k.disk_hourly_pct}
-            endIso={ref}
-            meta={`${k.disk_used_pct ?? "—"}%${diskPerDay == null ? "" : ` · ${diskPerDay >= 0 ? "+" : "−"}${Math.abs(diskPerDay).toFixed(1)} GB / day`}`}
-          />
-        ) : null}
-      </section>
+      <LiveCharts server={s} kpis={k} generatedAt={ref} />
 
       <div className="detail-grid">
         <div className="detail-main">
@@ -207,51 +185,11 @@ export function ServerDetailView({ d, now, asReport }: { d: ServerDetail; now: s
       {d.sample ? <span className="foot-note">Sample data · fictional server. Real details appear here once the collector reports.</span> : null}
     </div>
   );
-}
-
-/* ------------------------------------------------------------------ */
-/* KPI cards                                                           */
-/* ------------------------------------------------------------------ */
-
-function Kpis({ d }: { d: ServerDetail }) {
-  const { server: s, kpis: k, report } = d;
-  const since = new Date(Date.parse(report.generated_at) - s.uptime_seconds * 1000).toISOString();
-  const ramPct = k.ram_used_mb == null ? null : Math.round((k.ram_used_mb / s.ram_total_mb) * 100);
-  const ramStatus: Status | null = ramPct == null ? null : ramPct >= 95 ? "critical" : ramPct >= 90 ? "warning" : null;
-  const days = k.disk_days_until_full;
-  const diskStatus: Status | null =
-    k.disk_used_pct == null ? null : k.disk_used_pct >= 90 || (days != null && days <= 3) ? "critical" : k.disk_used_pct >= 80 || (days != null && days <= 14) ? "warning" : null;
-  const cpuStatus: Status | null = k.cpu_peak_pct != null && k.cpu_peak_pct >= 95 ? "warning" : null;
-
-  const tiles: { label: string; v: string; sub: ReactNode; st: Status | null }[] = [
-    { label: "Uptime", v: uptime(s.uptime_seconds), sub: `Since ${cairoDay(since)} · ${s.uptime_seconds < 86400 ? "rebooted in the last 24h" : "no reboots"}`, st: null },
-    {
-      label: "CPU 24h",
-      v: k.cpu_avg_pct == null ? "—" : `${Math.round(k.cpu_avg_pct)}% avg`,
-      sub: k.cpu_peak_pct == null ? "No data" : `Peak ${Math.round(k.cpu_peak_pct)}%${k.cpu_peak_at ? ` at ${cairoTime(k.cpu_peak_at)}` : ""}`,
-      st: cpuStatus,
-    },
-    { label: "RAM", v: k.ram_used_mb == null ? "—" : `${(k.ram_used_mb / 1024).toFixed(1)} / ${gb(s.ram_total_mb)}`, sub: ramPct == null ? "No data" : `${ramPct}% used`, st: ramStatus },
-    {
-      label: "Disk",
-      v: k.disk_used_pct == null ? "—" : `${k.disk_used_pct}%`,
-      sub: `${k.disk_used_gb == null ? "—" : k.disk_used_gb.toFixed(1)} / ${s.disk_total_gb} GB · ${days == null ? "no growth trend yet" : `full in ${days > 365 ? "365+" : days} days`}`,
-      st: diskStatus,
-    },
-  ];
+  if (asReport || !d.live) return page;
   return (
-    <div className="kpis">
-      {tiles.map((t) => (
-        <div key={t.label} className="kpi">
-          <span className="kpi-label">{t.label}</span>
-          <span dir="ltr" className="kpi-value" style={{ color: sevColor(t.st) }}>{t.v}</span>
-          <span className="kpi-sub" style={{ color: sevColor(t.st) }}>
-            {t.st ? <StatusIcon status={t.st} size={12} /> : null}
-            {t.sub}
-          </span>
-        </div>
-      ))}
-    </div>
+    <LiveProvider host={s.hostname} initial={d.live} reportAt={d.live.last_report_at ?? ref} renderedAt={now}>
+      {page}
+    </LiveProvider>
   );
 }
 
