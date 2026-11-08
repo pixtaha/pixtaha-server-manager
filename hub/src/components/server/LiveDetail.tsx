@@ -4,6 +4,7 @@ import { RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { StatusIcon } from "@/components/StatusPill";
+import { AnimatedNumber } from "@/components/live/AnimatedNumber";
 import { isFresh, useLivePoll } from "@/components/live/useLivePoll";
 import { ago, cairoDay, cairoTime, uptime } from "@/lib/format";
 import type { Kpis, LivePoint, LiveSnapshot, LiveState, ServerInfo, Status } from "@/lib/types";
@@ -63,7 +64,7 @@ export function LiveHeartbeat({ lastHeartbeatAt, collector, offline, renderedAt 
   const down = offline && !isLive;
   return (
     <span className="heartbeat" style={{ color: down ? "var(--color-offline)" : undefined }}>
-      {down ? <StatusIcon status="offline" size={12} /> : <span className={`heartbeat-dot${isLive ? " heartbeat-dot--live" : ""}`} aria-hidden />}
+      {down ? <StatusIcon status="offline" size={12} /> : <span key={isLive ? state?.live_at ?? "" : "static"} className={`heartbeat-dot${isLive ? " heartbeat-dot--live" : ""}`} aria-hidden />}
       {isLive ? "Live" : "Last heartbeat"} · {ago(seen, ctx ? new Date(Math.max(now, Date.parse(renderedAt))).toISOString() : renderedAt)} · agent v{snap?.collector ?? collector}
     </span>
   );
@@ -133,12 +134,12 @@ export function LiveKpis({ server: s, kpis: k, generatedAt }: { server: ServerIn
   const cpuNow = snap?.cpu;
   const cpuStatus: Status | null = (cpuNow != null && cpuNow >= 95) || (k.cpu_peak_pct != null && k.cpu_peak_pct >= 95) ? "warning" : null;
 
-  const tiles: { label: string; v: string; sub: ReactNode; st: Status | null }[] = [
+  const tiles: { label: string; v: ReactNode; sub: ReactNode; st: Status | null }[] = [
     { label: "Uptime", v: uptime(upS), sub: `Since ${cairoDay(new Date(bootMs).toISOString())} · ${upS < 86400 ? "rebooted in the last 24h" : "no reboots"}`, st: null },
     snap && cpuNow != null
       ? {
           label: "CPU now",
-          v: `${Math.round(cpuNow)}%`,
+          v: <><AnimatedNumber value={cpuNow} />%</>,
           sub: k.cpu_avg_pct == null ? `${snap.cores ?? s.cores} cores` : `24h avg ${Math.round(k.cpu_avg_pct)}% · peak ${Math.round(k.cpu_peak_pct ?? 0)}%`,
           st: cpuStatus,
         }
@@ -150,14 +151,14 @@ export function LiveKpis({ server: s, kpis: k, generatedAt }: { server: ServerIn
         },
     {
       label: "RAM",
-      v: ramUsed == null ? "—" : `${(ramUsed / 1024).toFixed(1)} / ${gb(ramTotal)}`,
-      sub: ramPct == null ? "No data" : `${ramPct}% used${snap?.swap_mb ? ` · swap ${snap.swap_mb} MB` : ""}`,
+      v: ramUsed == null ? "—" : <><AnimatedNumber value={ramUsed / 1024} format={(x) => x.toFixed(1)} /> / {gb(ramTotal)}</>,
+      sub: ramPct == null ? "No data" : <><AnimatedNumber value={ramPct} />% used{snap?.swap_mb ? ` · swap ${snap.swap_mb} MB` : ""}</>,
       st: ramStatus,
     },
     {
       label: "Disk",
-      v: diskPct == null ? "—" : `${diskPct}%`,
-      sub: `${diskGb == null ? "—" : diskGb.toFixed(1)} / ${diskTotal} GB · ${days == null ? "no growth trend yet" : `full in ${days > 365 ? "365+" : days} days`}`,
+      v: diskPct == null ? "—" : <><AnimatedNumber value={diskPct} format={(x) => x.toFixed(1)} />%</>,
+      sub: <>{diskGb == null ? "—" : <AnimatedNumber value={diskGb} format={(x) => x.toFixed(1)} />} / {diskTotal} GB · {days == null ? "no growth trend yet" : `full in ${days > 365 ? "365+" : days} days`}</>,
       st: diskStatus,
     },
   ];

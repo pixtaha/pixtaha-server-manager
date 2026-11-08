@@ -172,9 +172,8 @@ button { font: inherit; }
 .health-side { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .heartbeat { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-subtle); }
 .heartbeat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-healthy); }
-.heartbeat-dot--live { animation: pm-pulse 1.6s ease-in-out infinite; }
 .px-btn .spin { animation: pm-spin 1.1s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .heartbeat-dot--live, .px-btn .spin { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .px-btn .spin { animation: none; } }
 .offline-note { margin: 0; font-size: 14px; }
 
 /* ---------- KPI cards ---------- */
@@ -546,3 +545,38 @@ button { font: inherit; }
 .chip-row { display: flex; gap: 8px; overflow-x: auto; padding-block-end: 2px; }
 a.chip { text-decoration: none; white-space: nowrap; flex: none; }
 a.chip[aria-current="page"] { border-color: var(--color-text-subtle); background: var(--color-surface-sunken); }
+
+/* ---------- motion ----------
+ * Live data changes every 5 seconds: values glide (AnimatedNumber), bars and chart lines ease to their new
+ * shape, the heartbeat dot sends one ripple per update. Page sections rise in once when a page opens; live
+ * refreshes keep the same elements, so they do not replay. Everything is off with prefers-reduced-motion.
+ */
+.num { font-variant-numeric: tabular-nums; }
+.bar-fill { transition: width 700ms var(--ease-out), background-color var(--dur-slow) var(--ease-out); }
+.chart-svg path { transition: d 700ms var(--ease-out); }
+.chart-svg { animation: pm-reveal 900ms var(--ease-out) both; }
+.pill { transition: background-color var(--dur-slow) var(--ease-out), color var(--dur-slow) var(--ease-out); }
+.kpi-value, .kpi-sub, .summary-value, .bar-val, .chart-meta { transition: color var(--dur-slow) var(--ease-out); }
+.kpi, .chart, .summary-cell, .card { transition: border-color var(--dur) var(--ease-out), transform var(--dur) var(--ease-out), background var(--dur) var(--ease-out); }
+.kpi:hover, .chart:hover { border-color: var(--color-border-strong); }
+.card:hover { border-color: var(--color-border-strong); transform: translateY(-1px); }
+
+.heartbeat-dot--live { position: relative; }
+.heartbeat-dot--live::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--color-healthy); animation: pm-ripple 1.2s var(--ease-out) both; }
+
+.stack > *, .kpis > .kpi, .charts > .chart, .attn-item, .row--body, .cards > .card { animation: pm-rise var(--dur-slow) var(--ease-out) both; }
+.stack > :nth-child(2), .kpis > :nth-child(2), .charts > :nth-child(2), .row--body:nth-child(3), .cards > :nth-child(2) { animation-delay: 50ms; }
+.stack > :nth-child(3), .kpis > :nth-child(3), .charts > :nth-child(3), .row--body:nth-child(4), .cards > :nth-child(3) { animation-delay: 100ms; }
+.stack > :nth-child(4), .kpis > :nth-child(4), .row--body:nth-child(5), .cards > :nth-child(4) { animation-delay: 150ms; }
+.stack > :nth-child(5), .row--body:nth-child(6), .cards > :nth-child(5) { animation-delay: 200ms; }
+.stack > :nth-child(n+6), .row--body:nth-child(n+7), .cards > :nth-child(n+6) { animation-delay: 250ms; }
+
+@keyframes pm-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes pm-reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes pm-ripple { from { transform: scale(1); opacity: .55; } to { transform: scale(3.2); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .stack > *, .kpis > .kpi, .charts > .chart, .attn-item, .row--body, .cards > .card, .chart-svg, .heartbeat-dot--live::after { animation: none; }
+  .bar-fill, .chart-svg path, .card { transition: none; }
+  .card:hover { transform: none; }
+}

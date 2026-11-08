@@ -4,6 +4,7 @@ import { ChevronDown, LayoutGrid, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatedNumber } from "@/components/live/AnimatedNumber";
 import { isFresh, useLivePoll } from "@/components/live/useLivePoll";
 import { ago, cairoStamp } from "@/lib/format";
 import { STATUS_LABEL, STATUS_ORDER, type FleetSnapshot, type LiveState, type ServerSummary, type Status } from "@/lib/types";
@@ -70,6 +71,7 @@ export function FleetView({ fleet, loading = false }: { fleet: FleetSnapshot; lo
 
   const servers = useMemo(() => fleet.servers.map((s) => withLive(s, byHost.get(s.hostname), now)), [fleet.servers, byHost, now]);
   const anyLive = servers.some((s) => s.live);
+  const lastLive = live.reduce((m, l) => (l.live_at && l.live_at > m ? l.live_at : m), "");
   const refNow = new Date(Math.max(now, Date.parse(fleet.generatedAt))).toISOString();
   const clients = useMemo(() => Array.from(new Set(servers.map((s) => s.client))).sort(), [servers]);
   const envs = useMemo(() => Array.from(new Set(servers.map((s) => s.env))), [servers]);
@@ -93,7 +95,7 @@ export function FleetView({ fleet, loading = false }: { fleet: FleetSnapshot; lo
 
   const summary = [
     { label: "Servers", v: String(servers.length), sub: `${servers.length - offline.length} reporting`, c: "var(--color-text)" },
-    { label: "Containers up", v: `${up} / ${total}`, sub: total - up ? `${total - up} down` : "All running", c: "var(--color-text)" },
+    { label: "Containers up", v: <><AnimatedNumber value={up} /> / <AnimatedNumber value={total} /></>, sub: total - up ? `${total - up} down` : "All running", c: "var(--color-text)" },
     { label: "Critical alerts", v: String(crit), sub: "open", c: crit ? "var(--color-critical)" : "var(--color-text)" },
     { label: "Warning alerts", v: String(warn), sub: "open", c: warn ? "var(--color-warning)" : "var(--color-text)" },
     { label: "Offline agents", v: String(offline.length), sub: offline.map((s) => s.hostname).join(", ") || "All reporting", c: offline.length ? "var(--color-offline)" : "var(--color-text)" },
@@ -109,7 +111,7 @@ export function FleetView({ fleet, loading = false }: { fleet: FleetSnapshot; lo
           <h1 className="page-title">Fleet</h1>
           <span className="page-meta">
             {fleet.sample ? `${cairoStamp(fleet.generatedAt)} · sample data` : anyLive ? (
-              <><span className="heartbeat-dot heartbeat-dot--live" aria-hidden style={{ display: "inline-block", marginInlineEnd: 6 }} />Live · updates every 5 s</>
+              <><span key={lastLive} className="heartbeat-dot heartbeat-dot--live" aria-hidden style={{ display: "inline-block", marginInlineEnd: 6 }} />Live · updates every 5 s</>
             ) : `${cairoStamp(fleet.generatedAt)} · updates when servers report`}
           </span>
         </div>
@@ -182,7 +184,7 @@ export function FleetView({ fleet, loading = false }: { fleet: FleetSnapshot; lo
                 <div key={b.k} className="bar">
                   <span>{b.k}</span>
                   <div className="bar-track"><div className="bar-fill" style={{ width: `${b.v ?? 0}%`, background: barColor(b.v ?? 0) }} /></div>
-                  <span className="bar-val" style={{ color: barText(b.v ?? 0) }}>{b.label}</span>
+                  <span className="bar-val" style={{ color: barText(b.v ?? 0) }}>{b.v == null ? "—" : <><AnimatedNumber value={b.v} />%</>}</span>
                 </div>
               ))}
             </div>
@@ -211,7 +213,7 @@ export function FleetView({ fleet, loading = false }: { fleet: FleetSnapshot; lo
             <div dir="ltr" className="card-bars">
               {bars(s).map((b) => (
                 <div key={b.k}>
-                  <div className="card-bar-head"><span>{b.k}</span><span className="mono" style={{ color: barText(b.v ?? 0) }}>{b.label}</span></div>
+                  <div className="card-bar-head"><span>{b.k}</span><span className="mono" style={{ color: barText(b.v ?? 0) }}>{b.v == null ? "—" : <><AnimatedNumber value={b.v} />%</>}</span></div>
                   <div className="bar-track"><div className="bar-fill" style={{ width: `${b.v ?? 0}%`, background: barColor(b.v ?? 0) }} /></div>
                 </div>
               ))}
