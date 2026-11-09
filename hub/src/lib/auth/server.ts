@@ -2,6 +2,9 @@ import "server-only";
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { connection } from "next/server";
+import { cache } from "react";
 
 /**
  * Dashboard login, server side. All crypto lives here; the database (server_manager.hub_*) only
@@ -21,6 +24,19 @@ const TRUSTED_DAYS = 30;
 
 export function authConfigured(): boolean {
   return Boolean(process.env.HUB_SECRET && process.env.HUB_SECRET.length >= 32 && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/** Real dashboard data is configured (Supabase). Without it the hub only shows the fictional sample fleet. */
+export function dataConfigured(): boolean {
+  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/** Supabase is set but sign-in is not (HUB_SECRET missing or under 32 characters): nothing is shown. */
+export class SignInNotConfiguredError extends Error {
+  constructor() {
+    super("Sign-in is not configured: set HUB_SECRET (32+ characters). Dashboard data stays locked until then.");
+    this.name = "SignInNotConfiguredError";
+  }
 }
 
 // ------------------------------------------------------------------ store
@@ -227,6 +243,41 @@ export async function getSession(): Promise<Session | null> {
   if (!token) return null;
   const s = await db<Session | null>("session_get", { token_hash: sha256(token) });
   return s && !s.disabled ? s : null;
+}
+
+/** One session lookup per request, however many layouts, pages and data calls ask for it. */
+const sessionForRequest = cache(getSession);
+
+export type Viewer =
+  | { allowed: true; session: Session | null }
+  | { allowed: false; reason: "not-configured" | "signed-out" | "setup" };
+
+/**
+ * Who may read dashboard data. Fails closed:
+ * - sample mode (no Supabase): fictional data only, open, session null;
+ * - Supabase set but sign-in not configured: nobody;
+ * - otherwise only a full session (password + authenticator, or passkey).
+ * Checked next to the data (lib/data.ts) and in every API route, not only in the (app) layout:
+ * layouts do not run again on client navigation, so a layout-only check can be skipped.
+ */
+export async function viewer(): Promise<Viewer> {
+  // Decide per request, never at build time: a prerendered page would freeze the answer (and a
+  // build with Supabase set but no HUB_SECRET, like a preview, would fail on the error below).
+  await connection();
+  if (!dataConfigured()) return { allowed: true, session: null };
+  if (!authConfigured()) return { allowed: false, reason: "not-configured" };
+  const s = await sessionForRequest();
+  if (!s) return { allowed: false, reason: "signed-out" };
+  if (!s.mfa_done) return { allowed: false, reason: "setup" };
+  return { allowed: true, session: s };
+}
+
+/** For pages and the data they read: the session, or a redirect to sign-in. Throws when misconfigured. */
+export async function requireViewer(): Promise<Session | null> {
+  const v = await viewer();
+  if (v.allowed) return v.session;
+  if (v.reason === "not-configured") throw new SignInNotConfiguredError();
+  redirect(v.reason === "setup" ? "/login/setup" : "/login");
 }
 
 /** Marks the current session as fully signed in (after setup completes). */

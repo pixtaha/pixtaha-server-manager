@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authConfigured, getSession } from "@/lib/auth/server";
+import { viewer } from "@/lib/auth/server";
 import { getLive, requestRecheck } from "@/lib/data";
 
 /**
@@ -7,7 +7,8 @@ import { getLive, requestRecheck } from "@/lib/data";
  *   GET  /api/live              all servers: live snapshot + last report time
  *   GET  /api/live?host=<name>  one server, plus 24 h of 5-minute points
  *   POST /api/live?host=<name>  "Re-check now": ask the collector for a refresh report
- * Same session rules as the pages: a full session (MFA done) is required.
+ * Same session rules as the pages: a full session (MFA done) is required. Fails closed: with
+ * Supabase set but sign-in not configured, every call is 401.
  */
 export const dynamic = "force-dynamic";
 
@@ -15,9 +16,7 @@ const HOST = /^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$/;
 const noStore = { "Cache-Control": "no-store" };
 
 async function allowed(): Promise<boolean> {
-  if (!authConfigured()) return true;
-  const s = await getSession();
-  return Boolean(s && s.mfa_done);
+  return (await viewer()).allowed;
 }
 
 export async function GET(req: Request) {
