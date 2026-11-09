@@ -34,5 +34,8 @@ Owner: Taha (Pixtaha). Talk to him in Egyptian Arabic; everything in the repo is
 7. Live — done: collector 1.2.0 pushes a live snapshot every 5 s and a refresh report every 5 min straight to Supabase (`0007_live.sql`); pages poll `/api/live` every 5 s; "Re-check now".
 
 ## Checks before every push
-- `cd hub && npx tsc --noEmit && npx next build`
+- `cd hub && npx tsc --noEmit && npx next build && node scripts/check-auth.mjs`
+- Auth: every function in `hub/src/lib/data.ts` and every API route checks the viewer itself
+  (`viewer()` / `requireViewer()` in `hub/src/lib/auth/server.ts`). Never rely on the `(app)` layout
+  alone: client navigations can render a page without running its layout. Sign-in fails closed.
 - `git grep` for real IPs, client hostnames or tokens before committing.

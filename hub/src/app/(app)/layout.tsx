@@ -1,21 +1,17 @@
-import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/AppShell";
-import { authConfigured, getSession } from "@/lib/auth/server";
+import { requireViewer } from "@/lib/auth/server";
 import { getAlerts } from "@/lib/data";
 
 /**
  * Dashboard pages: sidebar on desktop, app bar + menu sheet on mobile.
  * With sign-in configured, every page needs a full session (password + authenticator, or passkey).
+ * The data functions in lib/data.ts check the session again: this layout does not run on every
+ * client navigation, so it cannot be the only gate.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  let account: { email: string } | null = null;
-  if (authConfigured()) {
-    const s = await getSession();
-    if (!s) redirect("/login");
-    if (!s.mfa_done) redirect("/login/setup");
-    account = { email: s.email };
-  }
+  const s = await requireViewer();
+  const account = s ? { email: s.email } : null;
   const { alerts } = await getAlerts();
   const openAlertIds = alerts.filter((a) => a.state === "open").map((a) => a.id);
   return (

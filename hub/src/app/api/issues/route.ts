@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { authConfigured, getSession } from "@/lib/auth/server";
+import { viewer } from "@/lib/auth/server";
 import { setAccepted } from "@/lib/data";
 
 /**
  * POST /api/issues  { host, key, accept: boolean, note?: string }
  * "Accept" (or undo) an attention item: it stays listed but no longer sets the server status.
- * Needs a full session (MFA done); same-origin only.
+ * Needs a full session (MFA done); same-origin only. Fails closed when sign-in is not configured.
  */
 export const dynamic = "force-dynamic";
 
@@ -13,12 +13,9 @@ const HOST = /^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$/;
 const noStore = { "Cache-Control": "no-store" };
 
 export async function POST(req: Request) {
-  let by: string | null = null;
-  if (authConfigured()) {
-    const s = await getSession();
-    if (!s || !s.mfa_done) return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: noStore });
-    by = s.email;
-  }
+  const v = await viewer();
+  if (!v.allowed) return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: noStore });
+  const by = v.session?.email ?? null;
   const origin = req.headers.get("origin");
   const hosts = [req.headers.get("host"), req.headers.get("x-forwarded-host")].filter(Boolean);
   if (origin && !hosts.includes(new URL(origin).host)) return NextResponse.json({ error: "bad origin" }, { status: 403, headers: noStore });

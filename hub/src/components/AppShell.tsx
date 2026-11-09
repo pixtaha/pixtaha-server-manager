@@ -4,6 +4,7 @@ import { Bell, LayoutGrid, LogOut, Mail, Menu, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { AddPasskey } from "./AddPasskey";
 import { AlertsStateProvider, useAlertsState } from "./alerts/AlertsState";
 import { InstallApp } from "./InstallApp";
 import { ThemeToggle } from "./ThemeToggle";
@@ -66,9 +67,12 @@ function Account() {
       <span dir="ltr" style={{ fontSize: 13 }}>{account?.email ?? "contact@pixtaha.com"}</span>
       <span className="subtle" style={{ fontSize: 12 }}>Read-only · Cairo UTC+2</span>
       {account ? (
-        <button type="button" className="px-btn px-btn--ghost px-btn--sm" style={{ marginTop: 8, alignSelf: "flex-start" }} onClick={signOut} disabled={busy} aria-busy={busy}>
-          <LogOut size={14} strokeWidth={1.75} aria-hidden /> {busy ? "Signing out…" : "Sign out"}
-        </button>
+        <>
+          <button type="button" className="px-btn px-btn--ghost px-btn--sm" style={{ marginTop: 8, alignSelf: "flex-start" }} onClick={signOut} disabled={busy} aria-busy={busy}>
+            <LogOut size={14} strokeWidth={1.75} aria-hidden /> {busy ? "Signing out…" : "Sign out"}
+          </button>
+          <AddPasskey />
+        </>
       ) : null}
       <InstallApp />
     </div>
