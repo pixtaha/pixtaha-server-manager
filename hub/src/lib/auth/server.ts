@@ -3,6 +3,7 @@ import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, 
 import { promisify } from "node:util";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { cache } from "react";
 
 /**
@@ -260,6 +261,9 @@ export type Viewer =
  * layouts do not run again on client navigation, so a layout-only check can be skipped.
  */
 export async function viewer(): Promise<Viewer> {
+  // Decide per request, never at build time: a prerendered page would freeze the answer (and a
+  // build with Supabase set but no HUB_SECRET, like a preview, would fail on the error below).
+  await connection();
   if (!dataConfigured()) return { allowed: true, session: null };
   if (!authConfigured()) return { allowed: false, reason: "not-configured" };
   const s = await sessionForRequest();
